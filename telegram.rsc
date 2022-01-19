@@ -1,7 +1,7 @@
 # Combined notification script and script launch via Telegram  by drPioneer
 # https://forummikrotik.ru/viewtopic.php?p=81945#p81945
 # tested on ROS 6.49
-# updated 2021/11/24
+# updated 2022/01/01
 
 :do {
     :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
@@ -86,7 +86,11 @@
     :local EpochTime do={
         :local ds [ /system clock get date; ];
         :local ts [ /system clock get time; ];
-        :if ([:len $1] > 8) do={
+        :if ([:len $1] > 19) do={
+            :set ds "$[:pick $1 0 11]";
+            :set ts [:pick $1 12 20];
+        }
+        :if ([:len $1] > 8 && [:len $1] < 20) do={
             :set ds "$[:pick $1 0 6]/$[:pick $ds 7 11]";
             :set ts [:pick $1 7 15];
         }
@@ -145,7 +149,8 @@
     # Part of the script body for notifications in Telegram by Alice Tails
     # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
     :local outMsg "";
-    :local logGet [ :toarray [ /log find ($topics ~"warning" || $topics ~"error" || $topics ~"critical" || $topics ~"caps" || $topics ~"wireless" || $message ~"logged in"); ]];
+    :local logGet [ :toarray [ /log find ($topics ~"warning" || $topics ~"error" || $topics ~"critical" || $topics ~"caps" \
+    || $topics ~"wireless" || $message ~"logged in"); ]];
     :local logCnt [ :len $logGet ];
     :put ("... Stage of sending notifications to Telegram:");
     :if ([:len $timeLog] = 0) do={ 
@@ -167,7 +172,8 @@
             :set tempMessage  (">".$tempTime." ".$tempMessage);
             :local findMacMsg ([$FindMacAddr $tempMessage]);
             :set unixTime [$EpochTime $tempTime];
-            :if (($unixTime > $timeLog) && (!(($tempTopic ~"caps" || $tempTopic ~"wireless" || $tempTopic ~"dhcp") && ($tempMessage != $findMacMsg)))) do={
+            :if (($unixTime > $timeLog) && (!(($tempTopic ~"caps" || $tempTopic ~"wireless" || $tempTopic ~"dhcp") \
+            && ($tempMessage != $findMacMsg)))) do={
                 :put $findMacMsg;
                 :set outMsg ($findMacMsg."\n".$outMsg);
             }
