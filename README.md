@@ -12,6 +12,7 @@
 В качестве команды могут выступать: имя глобальной функции, имя скрипта или команда RouterOS. Например:
 
 /forall log warning [/system identity get name]
+
 /Mikrotik1 wol
 
 Особенности работы скрипта:
