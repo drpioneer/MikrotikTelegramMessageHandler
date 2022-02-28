@@ -1,6 +1,7 @@
 # TLGRM - комбинированный скрипт оповещения в Телеграм и удалённого запуска функций, скриптов и команд RouterOS.
 
-В скрипте использованы идеи и часть кода by Sertik, Virtue, Pepelxl, Dimonw, Jotne, Alice Tails, drPioneer, Chupakabra
+В скрипте использованы идеи и часть кода by Sertik, Virtue, Pepelxl, Dimonw, Jotne, Alice Tails, drPioneer, Chupakabra.
+
 Для работы скрипта должны быть заранее известны и указаны BotID и ChatID.
 Скрипт необходимо добавить в System/Sheduler и установить запуск с нужной периодичностью.
 Суть работы скрипта сводится к выполнению двух основных задач:
