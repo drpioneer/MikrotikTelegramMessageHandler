@@ -1,12 +1,13 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
-# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, Jotne, Alice Tails, drPioneer.
+# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, Jotne, Alice Tails, drPioneer, Chupakabra
 # https://forummikrotik.ru/viewtopic.php?p=81945#p81945
 # tested on ROS 6.49
-# updated 2022/02/08
+# updated 2022/02/25
 
 :do {
     :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
     :local myChatID "-XXXXXXXXX";
+
     :local launchScr true;
     :local launchFnc true;
     :local launchCmd true;
@@ -234,27 +235,33 @@
                 :set  timeStamp [$MsgParser $content "date"];
                 :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Sender of the Telegram message: $userName")
                 :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Command to execute: '$msgTxt'")
-                :local params   [];
+                :local restline [];
                 :if ([:len [:find $msgTxt " "]] !=0) do={
-                    :set params [:pick $msgTxt  ([:find $msgTxt " "] +1) [:len $msgTxt]];
+                    :set restline [:pick $msgTxt  ([:find $msgTxt " "] +1) [:len $msgTxt]];
                     :set msgTxt [:pick $msgTxt 0 [:find $msgTxt " "]];
                 }
                 :if ($chatId=$myChatID && $timeAct<$timeStamp) do={
-                    :set timeAct ($timeStamp);
-                    :if ([/system script environment find name=$msgTxt;]!="" && $launchFnc=true) do={
-                        :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName launches function '$msgTxt'.");
-                        :log warning ("Telegram user $userName launches function '$msgTxt'.");
-                        [:parse ":global $msgTxt; [\$$msgTxt $params]"];
+                    :set timeAct $timeStamp;
+                    :if ([/system script environment find name=$msgTxt;]!="" && $launchFnc=true) do={   
+                        :if (([/system script environment get [/system script environment find name=$msgTxt] value]="(code)") \
+                            or  ([:len [:find [/system script environment get [/system script environment find name=$msgTxt;] value] "(eval"]]>0)) do={
+                            :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName launches function '$msgTxt'.");
+                            :log warning ("Telegram user $userName launches function '$msgTxt'.");
+                            [:parse ":global $msgTxt; [\$$msgTxt $restline]"];
+                        } else={
+                            :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - '$msgTxt' is a global variable and not a function - no execute.");
+                            :log warning ("'$msgTxt' is a global variable and not a function - no execute.");
+                        }
                     }
                     :if ([/system script find name=$msgTxt;]!="" && $launchScr=true) do={
                         :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName activates script '$msgTxt'.");
                         :log warning ("Telegram user $userName activates script '$msgTxt'.");
-                        /system script run $msgTxt;
+                        [[:parse "[:parse [/system script get $msgTxt source]] $restline"]];
                     }
                     :if ([/system script find name=$msgTxt;]="" && [/system script environment find name=$msgTxt;]="" && $launchCmd=true) do={
                         :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName is trying to execute command '$msgTxt'.");
                         :log warning ("Telegram user $userName is trying to execute command '$msgTxt'.");
-                        :do {[:parse "/$msgTxt $params"]} on-error={}
+                        :do {[:parse "/$msgTxt $restline"]} on-error={}
                     }
                 } else={ :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Wrong time to launch."); }
             } else={ :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - No command found for this device."); }
@@ -265,7 +272,7 @@
     # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
     :local outMsg "";
     :local logGet [ :toarray [ /log find ($topics ~"warning" || $topics ~"error" || $topics ~"critical" || $topics ~"caps" \
-    || $topics ~"wireless" || $message ~"logged in"); ]];
+    || $topics ~"wireless" || $message ~"logged in" || $message ~"TCP connection"); ]];
     :local logCnt [ :len $logGet ];
     :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - *** Stage of sending notifications to Telegram:");
     :if ([:len $timeLog] = 0) do={ 
@@ -308,4 +315,3 @@
     :put ("Script error: something didn't work when sending a request to Telegram.");
     :put ("*** First, check the correctness of the values of the variables botID & myChatID. ***"); 
 }
-
