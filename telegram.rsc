@@ -148,9 +148,9 @@
         :local months {0;31;28;31;30;31;30;31;31;30;31;30;31};
         :if (leap) do={:set dateD ($dateD+1); :set ($months->2) 29}
         :do {
-            :for i from=0 to=11 do={
-                :if (($months->$i)>=$dateD) do={
-                    :set dateM ($i+1);
+            :for i from=1 to=12 do={
+                :if (($months->$i)>$dateD) do={
+                    :set dateM $i;
                     :set dateD ($dateD+1);
                     break;
                 } else={:set dateD ($dateD-($months->$i))}
