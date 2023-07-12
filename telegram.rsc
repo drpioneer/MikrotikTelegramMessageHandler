@@ -1,8 +1,8 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
-# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, -13-, Mk51, Jotne, Alice Tails, Chupaka, rextended, drPioneer
+# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, -13-, Mk51, Alice Tails, Chupaka, Osama, rextended, drPioneer
 # https://forummikrotik.ru/viewtopic.php?p=81945#p81945
 # tested on ROS 6.49.8
-# updated 2023/07/10
+# updated 2023/07/12
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -15,11 +15,9 @@
     :local userInfo false;                                                              # fragment of code for user information output
     :local emo {
         "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
-        "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"
-    };                                                                                  # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
+        "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
     :global timeAct;                                                                    # time when the last command was executed
     :global timeLog;                                                                    # time when the log entries were last sent
-    :global timeOfDEL [/system clock get gmt-offset];                                   # time zone
 
     # --------------------------------------------------------------------------------- # MAC address search function
     :local FindMAC do={                                                                 # https://forummikrotik.ru/viewtopic.php?p=73994#p73994
@@ -62,10 +60,10 @@
             "D180";"D181";"D182";"D183";"D184";"D185";"D186";"D187";"D188";"D189";"D18A";"D18B";"D18C";"D18D";"D18E";"D18F"}
         :local res ""; :local urn "";
         :for i from=0 to=([:len $1]-1) do={
-            :local smb [:pick $1 $i ($i+1)];                                            # source symbol
-            :local idx [:find $cp1251 $smb];                                            # index
+            :local sym [:pick $1 $i ($i+1)];                                            # source symbol
+            :local idx [:find $cp1251 $sym];                                            # index
             :local utf ($utf8->$idx);                                                   # target symbol
-            :if ([:len $utf]=0) do={:set urn $smb}
+            :if ([:len $utf]=0) do={:set urn $sym}
             :if ([:len $utf]=2) do={:set urn "%$[:pick $utf 0 2]"}
             :if ([:len $utf]=4) do={:set urn "%$[:pick $utf 0 2]%$[:pick $utf 2 4]"}
             :if ([:len $utf]=6) do={:set urn "%$[:pick $utf 0 2]%$[:pick $utf 2 4]%$[:pick $utf 4 6]"}
@@ -75,23 +73,23 @@
     }
 
     # --------------------------------------------------------------------------------- # function of converting to lowercase letters
-    :local LowStr do={
-        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""}
-        :local FindChar do={
+    :local LowStr do={                                                                  # https://forummikrotik.ru/viewtopic.php?f=14&t=12659&p=87224#p87224
+        :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
+        :local LowChar do={
             :local upper "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             :local lower "abcdefghijklmnopqrstuvwxyz";
             :local pos [:find $upper $1];
-            :if ($pos> -1) do={:return [:pick $lower $pos]};                            # when match is found -> returning a lowercase character
+            :if ($pos>-1) do={:return [:pick $lower $pos]};                             # when match is found -> returning a lowercase character
             :return $1;
         }
         :local res ""; 
-        :for i from=0 to=([:len $1]-1) do={:set res ($res.[$FindChar [:pick $1 $i]])}
-        :return $res;                                                                   # returning string
+        :for i from=0 to=([:len $1]-1) do={:set res "$res$[$LowChar [:pick $1 $i]]"}
+        :return $res;                                                                   # returning a lowercase string
     }
 
     # --------------------------------------------------------------------------------- # telegram messenger response parsing function
     :local MsgParser do={                                                               # https://habr.com/ru/post/482802/
-        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""}
+        :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
         :local variaMod ("\"$2\"");
         :if ([:len [:find $1 $variaMod -1]]=0) do={:return "unknown"}
         :local startLoc ([:find $1 $variaMod -1]+[:len $variaMod]+1);
@@ -107,102 +105,78 @@
     }
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
-    :global EpochTimeDEL do={                                                           # https://forum.mikrotik.com/viewtopic.php?t=75555#p790745
-        :local ds [/system clock get date];                                             # usage: $EpochTime [time input]. get current time: put [$EpochTime]
-        :local ts [/system clock get time];                                             # read log time in 1 of 3 format: "hh:mm:ss", "mmm/dd hh:mm:ss" or "mmm/dd/yyyy hh:mm:ss"
-        :if ([:len $1]>19) do={:set ds "$[:pick $1 0 11]"; :set ts [:pick $1 12 20]}
-        :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$[:pick $ds 7 11]"; :set ts [:pick $1 7 15]}
-        :local yesterday false;
-        :if ([:len $1]=8) do={:if ([:totime $1]>ts) do={:set yesterday true}; :set ts $1}
-        :local months   {"an"=0;"eb"=31;"ar"=59;"pr"=90;"ay"=120;"un"=151;"ul"=181;"ug"=212;"ep"=243;"ct"=273;"ov"=304;"ec"=334};
-        :if ((([:pick $ds 9 11]-1)/4)!=(([:pick $ds 9 11])/4)) do={
-            :set months {"an"=0;"eb"=31;"ar"=60;"pr"=91;"ay"=121;"un"=152;"ul"=182;"ug"=213;"ep"=244;"ct"=274;"ov"=305;"ec"=335}
+    :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
+        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss", "mnt/da hh:mm:ss", "mnt/da/year hh:mm:ss", "year-mn-da hh:mm:ss"
+        /system clock;
+        :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
+        :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
+        :if ([:len $dTime]=15) do={:set dTime "$[:pick $dTime 0 6]/$cYear $[:pick $dTime 7 15]"}
+        :if ([:len $dTime]=14) do={:set dTime "$cYear-$[:pick $dTime 0 5] $[:pick $dTime 6 14]"}
+        :if ([:len $dTime]=8) do={:set dTime "$[get date] $dTime"}
+        :if ([:tostr $1]="") do={:set dTime ("$[get date] $[get time]")}
+        :local vDate [:pick $dTime 0 [:find $dTime " " -1]];
+        :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]];
+        :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
+        :if ($vGmt<0) do={:set vGmt ($vGmt * -1)}
+        :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
+        :local vdOff [:toarray "0,4,5,7,8,10"];
+        :local month [:tonum [:pick $vDate ($vdOff->2) ($vdOff->3)]];
+        :if ($vDate~".../../....") do={
+            :set vdOff [:toarray "7,11,1,3,4,6"];
+            :set month ([:find "xxanebarprayunulugepctovecANEBARPRAYUNULUGEPCTOVEC" [:pick $vDate ($vdOff->2) ($vdOff->3)] -1]/2);
+            :if ($month>12) do={:set month ($month-12)}
         }
-        :set ds (([:pick $ds 9 11]*365)+(([:pick $ds 9 11]-1)/4)+($months->[:pick $ds 1 3])+[:pick $ds 4 6]);
-        :set ts (([:pick $ts 0 2]*3600)+([:pick $ts 3 5]*60)+[:pick $ts 6 8]);
-        :if ($yesterday) do={:set ds ($ds-1)}
-        :return ($ds*86400+$ts+946684800-[/system clock get gmt-offset]);
+        :local year [:pick $vDate ($vdOff->0) ($vdOff->1)]; :if ((($year-1968)%4)=0) do={:set ($arrMn->1) -1; :set ($arrMn->2) 30}
+        :local toTd ((($year-1970)*365)+(($year-1968)/4)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)]-1));
+        :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt);
     }
 
     # --------------------------------------------------------------------------------- # time conversion function from UNIX-time
-    :global UnixTimeToFormatDEL do={                                                    # https://forummikrotik.ru/viewtopic.php?t=11636
-        :local decodedLine "";                                                          # usage: [$UnixTimeToFormat "timeStamp" "type"]
-        :local timeStamp $1;                                                            # type: "" - month/dd/yyyy <only>   (Mikrotik sheduller format)
-        :local timeS ($timeStamp%86400);                                                #        1 - yyyy/mm/dd hh:mm:ss
-        :local timeH ($timeS/3600);                                                     #        2 - dd/mm/yyyy hh:mm:ss
-        :local timeM ($timeS%3600 /60);                                                 #        3 - dd month yyyy hh mm ss
-        :set   timeS ($timeS-$timeH*3600-$timeM*60);                                    #        4 - yyyy month dd hh mm ss
-        :local dateD ($timeStamp/86400);                                                #        5 - month/dd/yyyy-hh:mm:ss (Mikrotik sheduller format)
-        :local dateM 2;
-        :local dateY 1970;
-        :local leap false;
-        :while (($dateD/365)>0) do={
-            :set dateD ($dateD-365);
-            :set dateY ($dateY+1);
-            :set dateM ($dateM+1);
-            :if ($dateM=4) do={
-                :set dateM 0;
-                :if (($dateY%400=0) or ($dateY%100!=0)) do={:set leap true; :set dateD ($dateD-1)}
-            } else={:set leap false}
+    :global UnixToDateTimeDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?p=977170#p977170
+        :local ZeroFill do={:return [:pick (100+$1) 1 3]}
+        :local prMntDays [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
+        :local vGmt [:tonum [/system clock get gmt-offset]]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
+        :if ($vGmt<0) do={:set vGmt ($vGmt* -1)}
+        :local tzEpoch ($vGmt+[:tonum $1]);
+        :if ($tzEpoch<0) do={:set tzEpoch 0};                                           # unsupported negative unix epoch
+        :local yearStart (1970+($tzEpoch/31536000));
+        :local tmpLeap (($yearStart-1968)/4); :if ((($yearStart-1968)%4)=0) do={:set ($prMntDays->1) -1; :set ($prMntDays->2) 30}
+        :local tmpSec ($tzEpoch%31536000);
+        :local tmpDays (($tmpSec/86400)-$tmpLeap);
+        :if ($tmpSec<(86400*$tmpLeap) && (($yearStart-1968)%4)=0) do={
+            :set tmpLeap ($tmpLeap-1); :set ($prMntDays->1) 0; :set ($prMntDays->2) 31; :set tmpDays ($tmpDays+1);
         }
-        :local months {0;31;28;31;30;31;30;31;31;30;31;30;31};
-        :if (leap) do={:set dateD ($dateD+1); :set ($months->2) 29}
-        :do {
-            :for i from=1 to=12 do={
-                :if (($months->$i)>$dateD) do={
-                    :set dateM $i;
-                    :set dateD ($dateD+1);
-                    break;
-                } else={:set dateD ($dateD-($months->$i))}
-            }
-        } on-error={}
-        :local tmod ""; :if ([:len $2]!=0) do={:set tmod $2}
-        :local mstr {"jan";"feb";"mar";"apr";"may";"jun";"jul";"aug";"sep";"oct";"nov";"dec"}
-        :local strY [:tostr $dateY];
-        :local strN "0$[:tostr $dateM]"; :if ($dateM>9) do={:set strN [:tostr $dateM]}
-        :local strD "0$[:tostr $dateD]"; :if ($dateD>9) do={:set strD [:tostr $dateD]}
-        :local strH "0$[:tostr $timeH]"; :if ($timeH>9) do={:set strH [:tostr $timeH]}
-        :local strM "0$[:tostr $timeM]"; :if ($timeM>9) do={:set strM [:tostr $timeM]}
-        :local strS "0$[:tostr $timeS]"; :if ($timeS>9) do={:set strS [:tostr $timeS]}
-        :if ([:len $tmod]=0) do={:set decodedLine "$($mstr->($dateM-1))/$strD/$strY"}
-        :if ($tmod=1) do={:set decodedLine "$strY/$strN/$strD $strH:$strM:$strS"}
-        :if ($tmod=2) do={:set decodedLine "$strD/$strN/$strY $strH:$strM:$strS"}
-        :if ($tmod=3) do={:set decodedLine "$strD $($mstr->($dateM-1)) $strY $strH:$strM:$strS"}
-        :if ($tmod=4) do={:set decodedLine "$strY $($mstr->($dateM-1)) $strD $strH:$strM:$strS"}
-        :if ($tmod=5) do={:set decodedLine "$($mstr->($dateM-1))/$strD/$strY-$strH:$strM:$strS"}
-        :return $decodedLine;
+        :if ($tmpSec<(86400*$tmpLeap)) do={:set yearStart ($yearStart-1); :set tmpDays ($tmpDays+365)}
+        :local mnthStart 12 ; :while (($prMntDays->$mnthStart)>$tmpDays) do={:set mnthStart ($mnthStart-1)}
+        :local dayStart [$ZeroFill (($tmpDays+1)-($prMntDays->$mnthStart))];
+        :local timeStart (00:00:00+[:totime ($tmpSec%86400)]);
+        :return "$yearStart/$[$ZeroFill $mnthStart]/$[$ZeroFill $dayStart] $timeStart";
     }
 
-    # --------------------------------------------------------------------------------- # current time output function
+    # --------------------------------------------------------------------------------- # current time in a nice format output function
     :local CurrentTime do={
-        :global timeOfDEL;                                                              # time offset
-        :global EpochTimeDEL;
-        :global UnixTimeToFormatDEL;
-        :return [$UnixTimeToFormatDEL ([$EpochTimeDEL]+$timeOfDEL) 1];                  # return current time
+        :global DateTime2EpochDEL;
+        :global UnixToDateTimeDEL;
+        :return [$UnixToDateTimeDEL [$DateTime2EpochDEL]];
     }
 
     # ================================================================================= # main body of the script ========================
-
     :local nameID [$LowStr [/system identity get name]];                                # text ID of router
     :local currTime [$CurrentTime];
-    :put ("$currTime\tStart of TLGRM on router:\t$nameID");
+    :put "$currTime\tStart of TLGRM on router:\t$nameID";
     :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};                             # creating a script execution flag
     :if ($scriptTlgrm) do={                                                             # when script is not active ->
         :set scriptTlgrm false;
-        :if ([:len $timeAct]>0) do={
-            :put ("$[$CurrentTime]\tTime executed last command:\t$[$UnixTimeToFormatDEL ($timeAct+$timeOfDEL) 1]");
-        }
-        :if ([:len $timeLog]>0) do={
-            :put ("$[$CurrentTime]\tTime sent last log entries:\t$[$UnixTimeToFormatDEL ($timeLog+$timeOfDEL) 1]");
-        }
-    
+        :if ([:len $timeAct]>0) do={:put "$[$CurrentTime]\tTime executed last command:\t$[$UnixToDateTimeDEL $timeAct]"}
+        :if ([:len $timeLog]>0) do={:put "$[$CurrentTime]\tTime sent last log entries:\t$[$UnixToDateTimeDEL $timeLog]"}
+
         # ----------------------------------------------------------------------------- # part of the script body to execute via Telegram ---
                                                                                         # https://forummikrotik.ru/viewtopic.php?p=78085
-        :local timeStmp [$EpochTimeDEL];
+        :put "$[$CurrentTime]\t*** Stage of launch via Telegram ***";
+        :local timeStmp [$DateTime2EpochDEL];
         :local urlString "https://api.telegram.org/$botID/getUpdates\?offset=-1&limit=1&allowed_updates=message";
         :local httpResp "";
-        :put ("$[$CurrentTime]\t*** Stage of launch via Telegram ***");
-        :if ([:len $timeAct]=0) do={:put ("$[$CurrentTime]\tTime of last launch not found");:set timeAct $timeStmp}
+        :if ([:len $timeAct]=0) do={:put "$[$CurrentTime]\tTime of last launch not found"; :set timeAct $timeStmp}
         :do {:set httpResp [/tool fetch url=$urlString as-value output=user]} on-error={}
         :if ([:len $httpResp]!=0) do={
             :local content ($httpResp->"data");
@@ -210,159 +184,150 @@
                 :local msgTxt [$MsgParser $content "text" true];
                 :set   msgTxt [:pick $msgTxt ([:find $msgTxt "/" -1]+1) [:len $msgTxt]];
                 :if ($msgTxt~"@") do={:set msgTxt [:pick $msgTxt 0 [:find $msgTxt "@"]]}
-                :local newStr "";
-                :local change "";
+                :local newStr ""; :local change ""; :local msgAddr "";
                 :for i from=0 to=([:len $msgTxt]-1) do={
                     :local symb [:pick $msgTxt $i ($i+1)];
                     :if ($symb="_") do={:set change " "} else={:set change $symb} 
-                    :set newStr ($newStr.$change);
+                    :set newStr "$newStr$change";
                 }
                 :set msgTxt $newStr;
-                :local msgAddr "";
                 :if ($broadCast) do={:set msgAddr $nameID} else={
                     :set msgAddr [:pick $msgTxt 0 [:find $msgTxt " " -1]];
                     :set msgAddr [$LowStr $msgAddr];
                     :if ([:len [:find $msgTxt " "]]=0) do={:set msgAddr "$msgTxt "}
-                    :put ("$[$CurrentTime]\tRecipient of Telegram message:\t$msgAddr");
+                    :put "$[$CurrentTime]\tRecipient of Telegram message:\t$msgAddr";
                     :set msgTxt [:pick $msgTxt ([:find $msgTxt $msgAddr -1]+[:len $msgAddr]+1) [:len $msgTxt]];
                 }
                 :if ( [:pick $msgTxt 0 1]= "\$") do={:set msgTxt [:pick $msgTxt 1 [:len $msgTxt]]}
-                :if (([:pick $msgTxt 0 2]="[\$") && ([:pick $msgTxt ([:len $msgTxt]-1) [:len $msgTxt]]="]")) do={
+                :if ([:pick $msgTxt 0 2]="[\$" && [:pick $msgTxt ([:len $msgTxt]-1) [:len $msgTxt]]="]") do={
                     :set msgTxt [:pick $msgTxt 2 ([:len $msgTxt]-1)];                   # skipping prefix "$"  or [$ .....]
                 }
                 :if ($msgAddr=$nameID or $msgAddr="forall") do={
                     :local chatID [$MsgParser [$MsgParser $content "chat"] "id"];
                     :local userNm [$MsgParser $content "username"];
                     :set timeStmp [$MsgParser $content "date"];
-                    :put ("$[$CurrentTime]\tSender of Telegram message:\t$userNm");
-                    :put ("$[$CurrentTime]\tCommand to execute:\t\t$msgTxt");
+                    :put "$[$CurrentTime]\tSender of Telegram message:\t$userNm";
+                    :put "$[$CurrentTime]\tCommand to execute:\t\t$msgTxt";
                     :local restline [];
                     :if ([:len [:find $msgTxt " "]]!=0) do={
                         :set restline [:pick $msgTxt  ([:find $msgTxt " "]+1) [:len $msgTxt]];
-                        :set msgTxt   [:pick $msgTxt 0 [:find $msgTxt " "]];
+                        :set msgTxt [:pick $msgTxt 0 [:find $msgTxt " "]];
                     }
                     :if ($chatID=$myChatID && $timeAct<$timeStmp) do={
                         :set timeAct $timeStmp;
                         :if ([/system script environment find name=$msgTxt]!="" && $launchFnc) do={
-                            :if (([/system script environment get [/system script environment find name=$msgTxt] value]="(code)") \
-                                or ([:len [:find [/system script environment get [/system script environment find name=$msgTxt] value] "(eval"]]>0)) do={
-                                :put ("$[$CurrentTime]\tRight time to launch function");
-                                :log warning ("Telegram user $userNm launches function: $msgTxt");
+                            :if (([/system script environment get [/system script environment find name=$msgTxt] value]="(code)")\
+                                or [:len [:find [/system script environment get [/system script environment find name=$msgTxt] value] "(eval"]]>0) do={
+                                :put "$[$CurrentTime]\tRight time to launch function";
+                                :log warning "Telegram user $userNm launches function: $msgTxt";
                                 :execute script="[:parse [\$$msgTxt $restline]]";
                             } else={
-                                :put ("$[$CurrentTime]\t'$msgTxt' is a global variable and is not launched");
-                                :log warning ("'$msgTxt' is a global variable and is not launched");
+                                :put "$[$CurrentTime]\t'$msgTxt' is a global variable and is not launched";
+                                :log warning "'$msgTxt' is a global variable and is not launched";
                             }
                         }
-                        :if ([:pick $msgTxt 0 1]="\5C") do={                            # allow to perform emodji
+                        :if ([:pick $msgTxt 0 1]="\5C") do={                            # allow to perform emoji
                             :set msgTxt [:pick $msgTxt 1 [:len $msgTxt]];
                             :if ([:find $msgTxt "\5C"]!=0) do={
-                                :local a [:pick $msgTxt 0 [:find $msgTxt "\5C"]];
-                                :local b [:pick $msgTxt  ([:find $msgTxt "\5C"]+1) [:len $msgTxt]];
-                                :set msgTxt ($a.$b);
+                                :local first [:pick $msgTxt 0 [:find $msgTxt "\5C"]];
+                                :local after [:pick $msgTxt  ([:find $msgTxt "\5C"]+1) [:len $msgTxt]];
+                                :set msgTxt "$first$after";
                             }
                         }
                         :if ([/system script find name=$msgTxt]!="" && $launchScr) do={
-                            :put ("$[$CurrentTime]\tRight time to activate script");
-                            :log warning ("Telegram user $userNm activates script: $msgTxt");
+                            :put "$[$CurrentTime]\tRight time to activate script";
+                            :log warning "Telegram user $userNm activates script: $msgTxt";
                             :execute script="[[:parse \"[:parse [/system script get $msgTxt source]] $restline\"]]";
                         }
                         :if ([/system script find name=$msgTxt]="" && [/system script environment find name=$msgTxt]="" && $launchCmd) do={
-                            :put ("$[$CurrentTime]\tRight time to execute command");
-                            :log warning ("Telegram user $userNm is trying to execute command: $msgTxt");
+                            :put "$[$CurrentTime]\tRight time to execute command";
+                            :log warning "Telegram user $userNm is trying to execute command: $msgTxt";
                             :do {:execute script="[:parse \"/$msgTxt $restline\"]"} on-error={}
                         }
-                    } else={:put ("$[$CurrentTime]\tWrong time to launch")}
-                } else={:put ("$[$CurrentTime]\tNo command found for this device")}
-            } else={:put ("$[$CurrentTime]\tCompletion of response from Telegram")}
-        } else={:put ("$[$CurrentTime]\tNot response from Telegram")}
-        :delay 1s;                                                                      # delay after command execution for correct log broadcast
+                    } else={:put "$[$CurrentTime]\tWrong time to launch"}
+                } else={:put "$[$CurrentTime]\tNo command found for this device"}
+            } else={:put "$[$CurrentTime]\tCompletion of response from Telegram"}
+        } else={:put "$[$CurrentTime]\tNot response from Telegram"}
+        :delay 1s;                                                                      # time difference between command execution and log broadcast
 
         # ----------------------------------------------------------------------------- # part of the script body for notifications in Telegram ----
                                                                                         # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
+        :put "$[$CurrentTime]\t*** Stage of broadcasting to Telegram ***";
+        :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
+            or topics~"dhcp" or message~"logged in")]];                                 # list of potentially interesting log entries
+        :local logCnt [:len $logGet];                                                   # counter of suitable log entries
+        :local tlgCnt 0;                                                                # counter of log entries sent to Telegram
         :local outMsg "";
-        :local logGet [:toarray [/log find ($topics~"warning" or $topics~"error" or $topics~"critical" or $topics~"caps" or $topics~"wireless"\
-            or $topics~"dhcp" or $message~"logged in")]];                               # list of potentially interesting log entries
-        :local logCnt [:len $logGet];                                                   # number of suitable log entries
-        :local tlgCnt 0;                                                                # number of log entries sent to Telegram
-        :put ("$[$CurrentTime]\t*** Stage of broadcasting to Telegram ***");
         :if ([:len $timeLog]=0) do={
-            :put ("$[$CurrentTime]\tTime of the last log entry was not found");
+            :put "$[$CurrentTime]\tTime of the last log entry was not found";
             :set outMsg "$[/system clock get time] Telegram notification started";
         }
         :if ($logCnt>0) do={                                                            # when log entries are available ->
-            :local lastTime [$EpochTimeDEL [/log get [:pick $logGet ($logCnt-1)] time]];# time of the last message
-            :local index 0;
+            :set logCnt ($logCnt-1);                                                    # index of last log entry
+            :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]];# time of the last message
             :local unixTim  "";
             :do {
-                :set index ($index+1);                                                  # message counter increment
-                :local tempTim [/log get [:pick $logGet ($logCnt-$index)] time];        # message time
-                :set   unixTim [$EpochTimeDEL $tempTim];
-                :local tempTpc [/log get [:pick $logGet ($logCnt-$index)] topics];      # message topic
-                :local tempMsg [/log get [:pick $logGet ($logCnt-$index)] message];     # message body
+                :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time
+                :set   unixTim [$DateTime2EpochDEL $tempTim];
+                :local tempTpc [/log get [:pick $logGet $logCnt] topics];               # message topic
+                :local tempMsg [/log get [:pick $logGet $logCnt] message];              # message body
                 :local tempMac [$FindMAC $tempMsg];                                     # finding MAC address in log entry
                 :local tempAdr ""; :local tempCmt ""; :local tempHst ""; :local tempDyn ""; :local tempIfc "empty"; :local tempStg "";
                 :do {
-                    :set tempCmt [/ip dhcp-server lease  get [find mac-address=$tempMac] comment];
-                    :set tempHst [/ip dhcp-server lease  get [find mac-address=$tempMac] host-name];
-                    :set tempAdr [/ip dhcp-server lease  get [find mac-address=$tempMac status="bound"] address];
-                    :set tempDyn [/ip dhcp-server lease  get [find mac-address=$tempMac status="bound"] dynamic];
+                    :set tempCmt [/ip dhcp-server lease get [find mac-address=$tempMac] comment];
+                    :set tempHst [/ip dhcp-server lease get [find mac-address=$tempMac] host-name];
+                    :set tempAdr [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] address];
+                    :set tempDyn [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] dynamic];
                     :set tempIfc [/interface bridge host get [find mac-address=$tempMac] on-interface];
-                    :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength];
+                    :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0];
                 } on-error={}
                 :local preloadMessage "";
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries
-                    :if (!(($tempTpc~"caps" or $tempTpc~"wireless" or $tempTpc~"dhcp") && ([:len $tempCmt]!=0)))\
+                    :if (!($tempTpc~"caps" or $tempTpc~"wireless" or $tempTpc~"dhcp" && [:len $tempCmt]!=0))\
                     do={                                                                # except of messages by topics: dhcp, caps, wifi with familiar MAC addresses
                         :set preloadMessage "$tempTim $tempMsg $tempCmt $tempHst $tempAdr";
                         :set tlgCnt ($tlgCnt+1);
-                        :set outMsg ("$preloadMessage\n$outMsg");                       # attach to general message for Telegram
-                        :put ("$[$CurrentTime]\tFound log entry: $preloadMessage");
+                        :set outMsg "$preloadMessage\n$outMsg";                         # attach to general message for Telegram
+                        :put "$[$CurrentTime]\tFound log entry: $preloadMessage";
                     }
 # ------------------- user information output --- BEGIN -------------------
                     :if ($userInfo) do={
                         :if ($tempTpc~"dhcp" && $tempMsg~" assigned") do={              # when address leasing DHCP server ->
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
-                            :if ($tempCmt=$user1) do={                                  # when connected user1 ->
-                                :set preloadMessage ("$tempTim $[($emo->"store")] $user1 at the $whereUser");
-                            }
-                            :if ($tempCmt=$user2) do={                                  # when connected user2 ->
-                                :set preloadMessage ("$tempTim $[($emo->"store")] $user2 at the $whereUser");
-                            }
+                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at the $whereUser"}
+                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at the $whereUser"}
                             :if ($tempDyn!="") do={                                     # when DHCP-server lease client is actual  ->
-                                :if ($tempDyn) do={                                     # when dynamic client ->
-                                    :set preloadMessage ("$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst");
-                                } else={                                                # when static client ->
-                                    :set preloadMessage ("$tempTim $[($emo->"phone")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst");
-                                }
+                                :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}\
+                                             else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
                             }
                             :if ([:len $preloadMessage]!=0) do={
                                 :set tlgCnt ($tlgCnt+1);
-                                :set outMsg ("$preloadMessage\n$outMsg");               # attach to general message for Telegram
-                                :put ("$[$CurrentTime]\tAdded user text: $preloadMessage");
+                                :set outMsg "$preloadMessage\n$outMsg";                 # attach to general message for Telegram
+                                :put "$[$CurrentTime]\tAdded user text: $preloadMessage";
                             }
                         }
                     }
 # ------------------- user information output --- END -------------------
                 }
-            } while=(($unixTim>$timeLog) && ($index<$logCnt));
-            :if (([:len $timeLog]<1) or (([:len $timeLog]>0) && ($timeLog!=$lastTime) && ([:len $outMsg]>8))) do={
+                :set logCnt ($logCnt-1);
+            } while=($unixTim>$timeLog && $logCnt> -1);
+            :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
                 :set timeLog $lastTime;
                 :set outMsg [$CP1251toUTF8inURN $outMsg];                               # convert MESSAGE to UTF8 in URN-standart
                 :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cut to 4096 characters
                 :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}
-                :local urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
-                :put ("$[$CurrentTime]\tGenerated string for Telegram:\r\n".$urlString);
-                /tool fetch url=$urlString as-value output=user;
-            } else={:put ("$[$CurrentTime]\tThere are no log entries to send")}
-        } else={:put ("$[$CurrentTime]\tNecessary log entries were not found")}
-        :put ("$[$CurrentTime]\tEnd of TLGRM-script");
+                :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
+                :put "$[$CurrentTime]\tGenerated string for Telegram:\r\n$urlString";
+                :do {/tool fetch url=$urlString as-value output=user} on-error={}
+            } else={:put "$[$CurrentTime]\tThere are no log entries to send"}
+        } else={:put "$[$CurrentTime]\tNecessary log entries were not found"}
+        :put "$[$CurrentTime]\tEnd of TLGRM-script";
         :set scriptTlgrm true;
         /system script environment remove [find name~"DEL"];                            # clearing memory
     } else={:put "$currTime\tScript already being executed"; :put "$currTime\tEnd of TLGRM-script"}
 } on-error={                                                                            # when emergency break script ->
     :set scriptTlgrm true;
     /system script environment remove [find name~"DEL"];                                # clearing memory
-    :put ("Script error: something didn't work when sending a request to Telegram");
-    :put ("*** First, check the correctness of the values of the variables botID & myChatID ***");
+    :put "Script error: something didn't work when sending a request to Telegram";
+    :put "*** First, check the correctness of the values of the variables botID & myChatID ***";
 }
