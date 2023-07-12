@@ -35,6 +35,6 @@
 
 Опытным путём выяснено, что предпочтителен групповой чат Телеграм с id БЕЗ префикса '-100', в таком чате сообщения от ГРУППЫ роутеров не теряются.
 
-https://forummikrotik.ru/viewtopic.php?p=83858#p83858
+https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 
 https://habr.com/ru/post/650563/
