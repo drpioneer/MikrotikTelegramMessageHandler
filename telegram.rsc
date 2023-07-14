@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/07/14
+# updated 2023/07/15
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -288,9 +288,7 @@
                     :if ($tempMac="") do={                                              # when message with missing MAC address ->
                         :set preloadMessage "$tempTim $tempMsg";
                     } else={
-                        :if ($tempDyn="") do={                                          # when DHCP-server lease client is not actual ->
-                            :set preloadMessage "$tempTim $tempMsg $tempHst $tempCmt inactive device";
-                        } else={
+                        :if ($tempDyn!="") do={                                         # when DHCP-server lease client is actual ->
                             :if (!$tempDyn && [:len $tempCmt]=0) do={                   # when message with static IP & unfamiliar MAC ->
                                 :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr empty comment on DHCP-Server lease"}
 # ------------------- user information output --- BEGIN -------------------
