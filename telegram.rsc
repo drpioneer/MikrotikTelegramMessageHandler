@@ -1,8 +1,9 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
-# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, -13-, Mk51, Alice Tails, Chupaka, Osama, rextended, drPioneer
-# https://forummikrotik.ru/viewtopic.php?p=81945#p81945
+# Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, drPioneer
+# https://forummikrotik.ru/viewtopic.php?p=89956#p89956
+# https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/07/12
+# updated 2023/07/14
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -25,7 +26,7 @@
         :if ($1~"[0-F][0-F]:[0-F][0-F]:[0-F][0-F]:[0-F][0-F]:[0-F][0-F]:[0-F][0-F]") do={
             :foreach id in=[/ip dhcp-server lease find disabled=no] do={
                 :local mac [/ip dhcp-server lease get $id mac-address];
-                :if ($1~$mac) do={:return $mac};
+                :if ($1~$mac) do={:return $mac}
             }
         }
         :return "";
@@ -83,8 +84,8 @@
             :return $1;
         }
         :local res ""; 
-        :for i from=0 to=([:len $1]-1) do={:set res "$res$[$LowChar [:pick $1 $i]]"}
-        :return $res;                                                                   # returning a lowercase string
+        :for i from=0 to=([:len $1]-1) do={:set res "$res$[$LowChar [:pick $1 $i]]"};   # formation of lowercase string
+        :return $res;
     }
 
     # --------------------------------------------------------------------------------- # telegram messenger response parsing function
@@ -106,7 +107,7 @@
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
     :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
-        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss", "mnt/da hh:mm:ss", "mnt/da/year hh:mm:ss", "year-mn-da hh:mm:ss"
+        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss","mon/da hh:mm:ss","mon/da/year hh:mm:ss","year-mo-da hh:mm:ss"
         /system clock;
         :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
         :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
@@ -117,7 +118,7 @@
         :local vDate [:pick $dTime 0 [:find $dTime " " -1]];
         :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]];
         :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
-        :if ($vGmt<0) do={:set vGmt ($vGmt * -1)}
+        :if ($vGmt<0) do={:set vGmt ($vGmt* -1)}
         :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
         :local vdOff [:toarray "0,4,5,7,8,10"];
         :local month [:tonum [:pick $vDate ($vdOff->2) ($vdOff->3)]];
@@ -261,10 +262,11 @@
         :if ([:len $timeLog]=0) do={
             :put "$[$CurrentTime]\tTime of the last log entry was not found";
             :set outMsg "$[/system clock get time] Telegram notification started";
+            :set tlgCnt ($tlgCnt+1);
         }
         :if ($logCnt>0) do={                                                            # when log entries are available ->
             :set logCnt ($logCnt-1);                                                    # index of last log entry
-            :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]];# time of the last message
+            :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]]; # time of the last message
             :local unixTim  "";
             :do {
                 :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time
@@ -285,8 +287,8 @@
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries
                     :if (!($tempTpc~"caps" or $tempTpc~"wireless" or $tempTpc~"dhcp" && [:len $tempCmt]!=0))\
                     do={                                                                # except of messages by topics: dhcp, caps, wifi with familiar MAC addresses
-                        :set preloadMessage "$tempTim $tempMsg $tempCmt $tempHst $tempAdr";
                         :set tlgCnt ($tlgCnt+1);
+                        :set preloadMessage "$tempTim $tempMsg $tempCmt $tempHst $tempAdr";
                         :set outMsg "$preloadMessage\n$outMsg";                         # attach to general message for Telegram
                         :put "$[$CurrentTime]\tFound log entry: $preloadMessage";
                     }
@@ -296,9 +298,11 @@
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
                             :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at the $whereUser"}
                             :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at the $whereUser"}
-                            :if ($tempDyn!="") do={                                     # when DHCP-server lease client is actual  ->
+                            :if ($tempDyn="") do={                                      # when DHCP-server lease client is not actual ->
+                                :set preloadMessage "$tempTim tempCmt $tempHst [$tempMac] disconnected and inactived"}\
+                            else={                                                      # when DHCP-server lease client is actual ->
                                 :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}\
-                                             else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
+                                    else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
                             }
                             :if ([:len $preloadMessage]!=0) do={
                                 :set tlgCnt ($tlgCnt+1);
@@ -313,9 +317,9 @@
             } while=($unixTim>$timeLog && $logCnt> -1);
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
                 :set timeLog $lastTime;
-                :set outMsg [$CP1251toUTF8inURN $outMsg];                               # convert MESSAGE to UTF8 in URN-standart
-                :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cut to 4096 characters
-                :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}
+                :set outMsg [$CP1251toUTF8inURN $outMsg];                               # converting MESSAGE to UTF8 in URN-standart
+                :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cutting MESSAGE to 4096 bytes
+                :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}; # solitary message for pop-up notification on phone
                 :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
                 :put "$[$CurrentTime]\tGenerated string for Telegram:\r\n$urlString";
                 :do {/tool fetch url=$urlString as-value output=user} on-error={}
