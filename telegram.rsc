@@ -107,7 +107,7 @@
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
     :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
-        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss","mon/da hh:mm:ss","mon/da/year hh:mm:ss","year-mo-da hh:mm:ss"
+        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
         /system clock;
         :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
         :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
@@ -255,7 +255,7 @@
                                                                                         # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
         :put "$[$CurrentTime]\t*** Stage of broadcasting to Telegram ***";
         :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
-            or topics~"dhcp" or message~"logged in")]];                                 # list of potentially interesting log entries
+            or topics~"dhcp" or topics~"firewall" or message~"logged in" or message~"sntp")]]; # list of potentially interesting log entries
         :local logCnt [:len $logGet];                                                   # counter of suitable log entries
         :local tlgCnt 0;                                                                # counter of log entries sent to Telegram
         :local outMsg "";
@@ -284,34 +284,33 @@
                     :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0];
                 } on-error={}
                 :local preloadMessage "";
-                :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries
-                    :if (!($tempTpc~"caps" or $tempTpc~"wireless" or $tempTpc~"dhcp" && [:len $tempCmt]!=0))\
-                    do={                                                                # except of messages by topics: dhcp, caps, wifi with familiar MAC addresses
-                        :set tlgCnt ($tlgCnt+1);
-                        :set preloadMessage "$tempTim $tempMsg $tempCmt $tempHst $tempAdr";
-                        :set outMsg "$preloadMessage\n$outMsg";                         # attach to general message for Telegram
-                        :put "$[$CurrentTime]\tFound log entry: $preloadMessage";
-                    }
+                :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries ->
+                    :if ($tempMac="") do={                                              # when message with missing MAC address ->
+                        :set preloadMessage "$tempTim $tempMsg";
+                    } else={
+                        :if ($tempDyn="") do={                                          # when DHCP-server lease client is not actual ->
+                            :set preloadMessage "$tempTim $tempMsg $tempHst $tempCmt inactive device";
+                        } else={
+                            :if (!$tempDyn && [:len $tempCmt]=0) do={                   # when message with static IP & unfamiliar MAC ->
+                                :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr empty comment on DHCP-Server lease"}
 # ------------------- user information output --- BEGIN -------------------
-                    :if ($userInfo) do={
-                        :if ($tempTpc~"dhcp" && $tempMsg~" assigned") do={              # when address leasing DHCP server ->
-                            :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
-                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at the $whereUser"}
-                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at the $whereUser"}
-                            :if ($tempDyn="") do={                                      # when DHCP-server lease client is not actual ->
-                                :set preloadMessage "$tempTim tempCmt $tempHst [$tempMac] disconnected and inactived"}\
-                            else={                                                      # when DHCP-server lease client is actual ->
-                                :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}\
+                            :if ($userInfo) do={
+                                :if ($tempMsg~" assigned") do={                         # when address leasing DHCP server ->
+                                    :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
+                                    :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at the $whereUser"}
+                                    :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at the $whereUser"}
+                                    :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}\
                                     else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
+                                }
                             }
-                            :if ([:len $preloadMessage]!=0) do={
-                                :set tlgCnt ($tlgCnt+1);
-                                :set outMsg "$preloadMessage\n$outMsg";                 # attach to general message for Telegram
-                                :put "$[$CurrentTime]\tAdded user text: $preloadMessage";
-                            }
+# ------------------- user information output --- END -------------------
                         }
                     }
-# ------------------- user information output --- END -------------------
+                }
+                :if ([:len $preloadMessage]!=0) do={
+                    :set tlgCnt ($tlgCnt+1);
+                    :set outMsg "$preloadMessage\n$outMsg";                             # attach to general message for Telegram
+                    :put "$[$CurrentTime]\tAdded entry: $preloadMessage";
                 }
                 :set logCnt ($logCnt-1);
             } while=($unixTim>$timeLog && $logCnt> -1);
