@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/07/15
+# updated 2023/07/19
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -107,16 +107,16 @@
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
     :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
-        :local dTime [:tostr $1];                                                       # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
+        :local dTime [:tostr $1]; :local yesterDay false;                               # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
         /system clock;
         :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
         :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
         :if ([:len $dTime]=15) do={:set dTime "$[:pick $dTime 0 6]/$cYear $[:pick $dTime 7 15]"}
         :if ([:len $dTime]=14) do={:set dTime "$cYear-$[:pick $dTime 0 5] $[:pick $dTime 6 14]"}
-        :if ([:len $dTime]=8) do={:set dTime "$[get date] $dTime"}
+        :if ([:len $dTime]=8) do={:if ([:totime $1]>[get time]) do={:set yesterDay true}; :set dTime "$[get date] $dTime"}
         :if ([:tostr $1]="") do={:set dTime ("$[get date] $[get time]")}
         :local vDate [:pick $dTime 0 [:find $dTime " " -1]];
-        :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]];
+        :local vTime [:pick $dTime ([:find $dTime " " -1] +1) [:len $dTime]];
         :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
         :if ($vGmt<0) do={:set vGmt ($vGmt* -1)}
         :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
@@ -128,7 +128,8 @@
             :if ($month>12) do={:set month ($month-12)}
         }
         :local year [:pick $vDate ($vdOff->0) ($vdOff->1)]; :if ((($year-1968)%4)=0) do={:set ($arrMn->1) -1; :set ($arrMn->2) 30}
-        :local toTd ((($year-1970)*365)+(($year-1968)/4)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)]-1));
+        :local toTd ((($year-1970)*365)+(($year-1968)/4)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)] -1));
+        :if ($yesterDay) do={:set toTd ($toTd-1)}
         :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt);
     }
 
@@ -154,7 +155,7 @@
         :return "$yearStart/$[$ZeroFill $mnthStart]/$[$ZeroFill $dayStart] $timeStart";
     }
 
-    # --------------------------------------------------------------------------------- # current time in a nice format output function
+    # --------------------------------------------------------------------------------- # current time in nice format output function
     :local CurrentTime do={
         :global DateTime2EpochDEL;
         :global UnixToDateTimeDEL;
@@ -255,13 +256,14 @@
                                                                                         # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
         :put "$[$CurrentTime]\t*** Stage of broadcasting to Telegram ***";
         :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
-            or topics~"dhcp" or topics~"firewall" or message~"logged in" or message~"sntp")]]; # list of potentially interesting log entries
+            or topics~"dhcp" or message~"logged in")]];                                 # list of potentially interesting log entries
         :local logCnt [:len $logGet];                                                   # counter of suitable log entries
         :local tlgCnt 0;                                                                # counter of log entries sent to Telegram
         :local outMsg "";
         :if ([:len $timeLog]=0) do={
             :put "$[$CurrentTime]\tTime of the last log entry was not found";
             :set outMsg "$[/system clock get time] Telegram notification started";
+
             :set tlgCnt ($tlgCnt+1);
         }
         :if ($logCnt>0) do={                                                            # when log entries are available ->
@@ -269,8 +271,8 @@
             :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]]; # time of the last message
             :local unixTim  "";
             :do {
-                :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time
-                :set   unixTim [$DateTime2EpochDEL $tempTim];
+                :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time in router format
+                :set unixTim [$DateTime2EpochDEL $tempTim];                             # message time in UNIX format
                 :local tempTpc [/log get [:pick $logGet $logCnt] topics];               # message topic
                 :local tempMsg [/log get [:pick $logGet $logCnt] message];              # message body
                 :local tempMac [$FindMAC $tempMsg];                                     # finding MAC address in log entry
