@@ -107,8 +107,8 @@
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
     :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
-        :local dTime [:tostr $1]; :local yesterDay false;                               # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
-        /system clock;
+        :local dTime [:tostr $1]; :local yesterDay false;                               # parses date formats:  "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss",
+        /system clock;                                                                  #                       "yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
         :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
         :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
         :if ([:len $dTime]=15) do={:set dTime "$[:pick $dTime 0 6]/$cYear $[:pick $dTime 7 15]"}
@@ -129,7 +129,7 @@
         }
         :local year [:pick $vDate ($vdOff->0) ($vdOff->1)]; :if ((($year-1968)%4)=0) do={:set ($arrMn->1) -1; :set ($arrMn->2) 30}
         :local toTd ((($year-1970)*365)+(($year-1968)/4)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)] -1));
-        :if ($yesterDay) do={:set toTd ($toTd-1)}
+        :if ($yesterDay) do={:set toTd ($toTd-1)};                                      # bypassing ROS6.xx time format problem after 00:00:00
         :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt);
     }
 
@@ -258,14 +258,13 @@
         :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
             or topics~"dhcp" or message~"logged in")]];                                 # list of potentially interesting log entries
         :local logCnt [:len $logGet];                                                   # counter of suitable log entries
-        :local tlgCnt 0;                                                                # counter of log entries sent to Telegram
-        :local outMsg "";
+        :local outMsg ""; :local tlgCnt 0;                                              # counter of log entries sent to Telegram
         :if ([:len $timeLog]=0) do={
             :put "$[$CurrentTime]\tTime of the last log entry was not found";
             :set outMsg "$[/system clock get time] Telegram notification started";
-
             :set tlgCnt ($tlgCnt+1);
         }
+        :if ($timeLog>[$DateTime2EpochDEL]) do={:set timeLog [$DateTime2EpochDEL]};     # correction when time of last broadcast to Telegram turned out to be from future
         :if ($logCnt>0) do={                                                            # when log entries are available ->
             :set logCnt ($logCnt-1);                                                    # index of last log entry
             :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]]; # time of the last message
