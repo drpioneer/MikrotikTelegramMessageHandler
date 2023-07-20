@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/07/19
+# updated 2023/07/20
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -38,7 +38,7 @@
         :local cp1251 {
             "\00";"\01";"\02";"\03";"\04";"\05";"\06";"\07";"\08";"\09";"\0A";"\0B";"\0C";"\0D";"\0E";"\0F";
             "\10";"\11";"\12";"\13";"\14";"\15";"\16";"\17";"\18";"\19";"\1A";"\1B";"\1C";"\1D";"\1E";"\1F";
-            "\20";"\22";"\26";"\3C";"\3E";"\5B";"\5C";"\5D";"\5E";"\60";"\7B";"\7C";"\7D";"\7E";"\7F";
+            "\20";"\22";"\26";"\2B";"\3C";"\3E";"\5B";"\5C";"\5D";"\5E";"\60";"\7B";"\7C";"\7D";"\7E";"\7F";
             "\80";"\81";"\82";"\83";"\84";"\85";"\86";"\87";"\88";"\89";"\8A";"\8B";"\8C";"\8D";"\8E";"\8F";
             "\90";"\91";"\92";"\93";"\94";"\95";"\96";"\97";"\98";"\99";"\9A";"\9B";"\9C";"\9D";"\9E";"\9F";
             "\A0";"\A1";"\A2";"\A3";"\A4";"\A5";"\A6";"\A7";"\A8";"\A9";"\AA";"\AB";"\AC";"\AD";"\AE";"\AF";
@@ -50,7 +50,7 @@
         :local utf8 {
             "00";"01";"02";"03";"04";"05";"06";"07";"08";"09";"0A";"0B";"0C";"0D";"0E";"0F";
             "10";"11";"12";"13";"14";"15";"16";"17";"18";"19";"1A";"1B";"1C";"1D";"1E";"1F";
-            "20";"22";"26";"3C";"3E";"5B";"5C";"5D";"5E";"60";"7B";"7C";"7D";"7E";"7F";
+            "20";"22";"26";"2B";"3C";"3E";"5B";"5C";"5D";"5E";"60";"7B";"7C";"7D";"7E";"7F";
             "D082";"D083";"E2809A";"D193";"E2809E";"E280A6";"E280A0";"E280A1";"E282AC";"E280B0";"D089";"E280B9";"D08A";"D08C";"D08B";"D08F";
             "D192";"E28098";"E28099";"E2809C";"E2809D";"E280A2";"E28093";"E28094";"EFBFBD";"E284A2";"D199";"E280BA";"D19A";"D19C";"D19B";"D19F";
             "C2A0";"D08E";"D19E";"D088";"C2A4";"D290";"C2A6";"C2A7";"D081";"C2A9";"D084";"C2AB";"C2AC";"534859";"C2AE";"D087";
@@ -256,7 +256,7 @@
                                                                                         # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
         :put "$[$CurrentTime]\t*** Stage of broadcasting to Telegram ***";
         :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
-            or topics~"dhcp" or message~"logged in")]];                                 # list of potentially interesting log entries
+            or topics~"dhcp" or topics ~"firewall" or message~" logged ")]];            # list of potentially interesting log entries
         :local logCnt [:len $logGet];                                                   # counter of suitable log entries
         :local outMsg ""; :local tlgCnt 0;                                              # counter of log entries sent to Telegram
         :if ([:len $timeLog]=0) do={
@@ -284,25 +284,26 @@
                     :set tempIfc [/interface bridge host get [find mac-address=$tempMac] on-interface];
                     :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0];
                 } on-error={}
+                :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                 :local preloadMessage "";
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries ->
                     :if ($tempMac="") do={                                              # when message with missing MAC address ->
                         :set preloadMessage "$tempTim $tempMsg";
                     } else={
                         :if ($tempDyn!="") do={                                         # when DHCP-server lease client is actual ->
-                            :if (!$tempDyn && [:len $tempCmt]=0) do={                   # when message with static IP & unfamiliar MAC ->
-                                :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr empty comment on DHCP-Server lease"}
+                            :if (!$tempDyn && $tempCmt="") do={                         # when message with static IP & unfamiliar MAC ->
+                                :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr empty client comment on DHCP lease"}
 # ------------------- user information output --- BEGIN -------------------
                             :if ($userInfo) do={
-                                :if ($tempMsg~" assigned") do={                         # when address leasing DHCP server ->
+                                :if ($tempMsg~" assigned ") do={                        # when address leasing DHCP server ->
                                     :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
-                                    :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at the $whereUser"}
-                                    :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at the $whereUser"}
-                                    :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}\
-                                    else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
+                                    :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst";
+                                    } else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
+                                    :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"}
+                                    :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"}
                                 }
                             }
-# ------------------- user information output --- END -------------------
+# ------------------- user information output ---- END ------------------
                         }
                     }
                 }
