@@ -287,25 +287,23 @@
                 :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                 :local preloadMessage "";
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries ->
-                    :if ($tempMac="") do={                                              # when message with missing MAC address ->
-                        :set preloadMessage "$tempTim $tempMsg";
-                    } else={
+                    :if ($tempMac!="") do={                                             # when message with real MAC address ->
                         :if ($tempDyn!="") do={                                         # when DHCP-server lease client is actual ->
                             :if (!$tempDyn && $tempCmt="") do={                         # when message with static IP & unfamiliar MAC ->
-                                :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr empty client comment on DHCP lease"}
+                                :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [empty client comment on DHCP lease]"}
 # ------------------- user information output --- BEGIN -------------------
                             :if ($userInfo) do={
                                 :if ($tempMsg~" assigned ") do={                        # when address leasing DHCP server ->
                                     :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
-                                    :if ($tempDyn) do={:set preloadMessage "$tempTim $prefiksForLan $tempCmt +$tempIfc $tempStg $tempAdr $tempHst";
-                                    } else={:set preloadMessage "$tempTim $[($emo->"bell")] $tempCmt +$tempIfc $tempStg $tempAdr $tempHst"}
-                                    :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"}
-                                    :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"}
+									:if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempCmt $tempAdr $tempHst"; # output when dynamic client
+                                    } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};                              # output when static client
+                                    :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"};                  # output when user1
+                                    :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"};                  # output when user2
                                 }
                             }
 # ------------------- user information output ---- END ------------------
                         }
-                    }
+                    } else={:set preloadMessage "$tempTim $tempMsg"};                   # when message with missing MAC address -> output message
                 }
                 :if ([:len $preloadMessage]!=0) do={
                     :set tlgCnt ($tlgCnt+1);
