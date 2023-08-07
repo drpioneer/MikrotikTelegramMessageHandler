@@ -1,5 +1,5 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
-# Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, drPioneer
+# Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, sebastia, drPioneer
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
@@ -22,8 +22,8 @@
     :global timeLog;                                                                    # time when the log entries were last sent
 
     # --------------------------------------------------------------------------------- # function of converting CP1251 to UTF8 in URN-standart
-    :local CP1251toUTF8inURN do={                                                       # https://habr.com/ru/articles/232385/#urn
-        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""}
+    :local CP1251toUTF8inURN do={                                                       # https://forum.mikrotik.com/viewtopic.php?p=967513#p967513
+        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""};                   # https://habr.com/ru/articles/232385/#urn
         :local cp1251 {
             "\00";"\01";"\02";"\03";"\04";"\05";"\06";"\07";"\08";"\09";"\0A";"\0B";"\0C";"\0D";"\0E";"\0F";
             "\10";"\11";"\12";"\13";"\14";"\15";"\16";"\17";"\18";"\19";"\1A";"\1B";"\1C";"\1D";"\1E";"\1F";
@@ -63,18 +63,18 @@
     }
 
     # --------------------------------------------------------------------------------- # function of converting to lowercase letters
-    :local LowStr do={                                                                  # https://forummikrotik.ru/viewtopic.php?f=14&t=12659&p=87224#p87224
+    :local LowerCase do={                                                               # https://forum.mikrotik.com/viewtopic.php?p=714396#p714396
         :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
-        :local LowChar do={
-            :local upper "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            :local lower "abcdefghijklmnopqrstuvwxyz";
-            :local pos [:find $upper $1];
-            :if ($pos>-1) do={:return [:pick $lower $pos]};                             # when match is found -> returning a lowercase character
-            :return $1;
+        :local lower "abcdefghijklmnopqrstuvwxyz";
+        :local upper "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        :local result "";
+        :for i from=0 to=([:len $1]-1) do={
+            :local char [:pick $1 $i];
+            :local pos [:find $upper $char];
+            :if ($pos>-1) do={:set char [:pick $lower $pos]};
+            :set result ($result.$char);
         }
-        :local res ""; 
-        :for i from=0 to=([:len $1]-1) do={:set res "$res$[$LowChar [:pick $1 $i]]"};   # formation of lowercase string
-        :return $res;
+        :return $result;
     }
 
     # --------------------------------------------------------------------------------- # telegram messenger response parsing function
@@ -152,7 +152,7 @@
     }
 
     # ================================================================================= # main body of the script ========================
-    :local nameID [$LowStr [/system identity get name]];                                # text ID of router
+    :local nameID [$LowerCase [/system identity get name]];                             # text ID of router
     :local currTime [$CurrentTime];
     :put "$currTime\tStart of TLGRM on router:\t$nameID";
     :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};                             # creating a script execution flag
@@ -183,7 +183,7 @@
                 :set msgTxt $newStr;
                 :if ($broadCast) do={:set msgAddr $nameID} else={
                     :set msgAddr [:pick $msgTxt 0 [:find $msgTxt " " -1]];
-                    :set msgAddr [$LowStr $msgAddr];
+                    :set msgAddr [$LowerCase $msgAddr];
                     :if ([:len [:find $msgTxt " "]]=0) do={:set msgAddr "$msgTxt "}
                     :put "$[$CurrentTime]\tRecipient of Telegram message:\t$msgAddr";
                     :set msgTxt [:pick $msgTxt ([:find $msgTxt $msgAddr -1]+[:len $msgAddr]+1) [:len $msgTxt]];
