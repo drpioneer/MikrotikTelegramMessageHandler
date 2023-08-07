@@ -14,7 +14,7 @@
     :local launchFnc true;                                                              # permission to perform functions
     :local launchCmd true;                                                              # permission to execute commands
     :local sysInfo   true;                                                              # system information broadcast to Telegram
-    :local userInfo  false;                                                             # user information broadcast to Telegram
+    :local userInfo  true;                                                              # user information broadcast to Telegram
     :local emo {
         "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
         "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
@@ -287,7 +287,7 @@
 # ------------------- user information output --- BEGIN -------------------
                     :if ($userInfo) do={                                                # broadcast USER information ->
                         :if ($tempMsg~" assigned ([0-9]{3}[.]){3}[0-9]{3}") do={
-                            :if ($tempMsg~" to ")  do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to"] -1)]}; # specificity ROS6
+                            :if ($tempMsg~" to " ) do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to" ]-1)]}; # specificity ROS6
                             :if ($tempMsg~" for ") do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "for"]-1)]}; # specificity ROS7
                         }
                         :if ($tempAdr!="") do={                                         # when address leasing DHCP server ->
