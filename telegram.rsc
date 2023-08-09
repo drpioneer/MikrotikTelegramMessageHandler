@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/07
+# updated 2023/08/09
 
 :global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
 :do {
@@ -259,40 +259,49 @@
             :do {
                 :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time in router format
                 :set unixTim [$DateTime2EpochDEL $tempTim];                             # message time in UNIX format
-                :local tempTpc [/log get [:pick $logGet $logCnt] topics];               # message topic
-                :local tempMsg [/log get [:pick $logGet $logCnt] message];              # message body
-                :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst ""; :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
-                :local preloadMessage "";
-                :if ($tempMsg~"([0-9A-Fa-f]{2}[:]){5}[0-9A-Fa-f]{2}") do={:set tempMac [:pick $tempMsg ([:find $tempMsg ":"]-2) ([:find $tempMsg ":"]+15)]}
-                :do {
-                    :set tempCmt [/ip dhcp-server lease get [find mac-address=$tempMac] comment];
-                    :set tempHst [/ip dhcp-server lease get [find mac-address=$tempMac] host-name];
-                } on-error={}
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries ->
+                    :local tempMsg [/log get [:pick $logGet $logCnt] message];          # message body
 # ------------------ system information output --- BEGIN ------------------
                     :if ($sysInfo) do={                                                 # broadcast SYSTEM information ->
-                        :do {
-                            :set tempAdr [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] address];
-                            :set tempDyn [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] dynamic];
-                        } on-error={}
+                        :local preloadMessage "";
+                        :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
+                        :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
+                        :if ($tempMsg~"([0-9A-Fa-f]{2}[:]){5}[0-9A-Fa-f]{2}") do={:set tempMac [:pick $tempMsg ([:find $tempMsg ":"]-2) ([:find $tempMsg ":"]+15)]}
                         :if ($tempMac="") do={:set preloadMessage "$tempTim $tempMsg";  # output when message without real MAC address
                         } else={                                                        # when message with real MAC address ->
+                            :do {
+                                :set tempCmt [/ip dhcp-server lease get [find mac-address=$tempMac] comment];
+                                :set tempHst [/ip dhcp-server lease get [find mac-address=$tempMac] host-name];
+                                :set tempDyn [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] dynamic];
+                                :set tempAdr [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] address];
+                            } on-error={}
                             :if ($tempDyn!="") do={                                     # when DHCP-server lease client is actual ->
                                 :if (!$tempDyn && $tempCmt="") do={                     # when message with static IP & unfamiliar MAC ->
                                     :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [empty client comment on DHCP lease]"}
                             }
                         }
+                        :if ($preloadMessage!="") do={
+                            :set tlgCnt ($tlgCnt+1);
+                            :set outMsg "$preloadMessage\n$outMsg";                     # attach to general message for Telegram
+                            :put "$[$CurrentTime]\tAdded entry: $preloadMessage";
+                        }
                     }
 # ------------------- system information output ---- END ------------------
 # ------------------- user information output --- BEGIN -------------------
                     :if ($userInfo) do={                                                # broadcast USER information ->
+                        :local preloadMessage "";
+                        :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
+                        :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
                         :if ($tempMsg~" assigned ([0-9]{3}[.]){3}[0-9]{3}") do={
                             :if ($tempMsg~" to " ) do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to" ]-1)]}; # specificity ROS6
                             :if ($tempMsg~" for ") do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "for"]-1)]}; # specificity ROS7
                         }
                         :if ($tempAdr!="") do={                                         # when address leasing DHCP server ->
                             :do {
+                                :set tempCmt [/ip dhcp-server lease get [find address=$tempAdr] comment];
+                                :set tempHst [/ip dhcp-server lease get [find address=$tempAdr] host-name];
                                 :set tempDyn [/ip dhcp-server lease get [find address=$tempAdr] dynamic];
+                                :set tempMac [/ip dhcp-server lease get [find address=$tempAdr] mac-address];
                                 :set tempIfc [/interface bridge host get [find mac-address=$tempMac] on-interface];
                                 :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0];
                             } on-error={}
@@ -305,14 +314,14 @@
                             :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"};  # output when user1
                             :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"};  # output when user2
                         }
+                        :if ($preloadMessage!="") do={
+                            :set tlgCnt ($tlgCnt+1);
+                            :set outMsg "$preloadMessage\n$outMsg";                     # attach to general message for Telegram
+                            :put "$[$CurrentTime]\tAdded entry: $preloadMessage";
+                        }
                     }
+                }
 # -------------------- user information output ---- END -------------------
-                }
-                :if ([:len $preloadMessage]!=0) do={
-                    :set tlgCnt ($tlgCnt+1);
-                    :set outMsg "$preloadMessage\n$outMsg";                             # attach to general message for Telegram
-                    :put "$[$CurrentTime]\tAdded entry: $preloadMessage";
-                }
                 :set logCnt ($logCnt-1);
             } while=($unixTim>$timeLog && $logCnt>-1);
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
