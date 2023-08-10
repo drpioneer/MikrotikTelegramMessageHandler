@@ -3,9 +3,9 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/09
+# updated 2023/08/10
 
-:global scriptTlgrm;                                                                    # flag of the running script: false=in progress, true=idle
+:global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
     :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
     :local myChatID "-XXXXXXXXX";
@@ -14,7 +14,7 @@
     :local launchFnc true;                                                              # permission to perform functions
     :local launchCmd true;                                                              # permission to execute commands
     :local sysInfo   true;                                                              # system information broadcast to Telegram
-    :local userInfo  true;                                                              # user information broadcast to Telegram
+    :local userInfo  false;                                                             # user information broadcast to Telegram
     :local emo {
         "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
         "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
@@ -153,11 +153,11 @@
 
     # ================================================================================= # main body of the script ========================
     :local nameID [$LowerCase [/system identity get name]];                             # text ID of router
-    :local currTime [$CurrentTime];
+    :local currTime [$CurrentTime];                                                     # current time in nice format
     :put "$currTime\tStart of TLGRM on router:\t$nameID";
-    :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};                             # creating a script execution flag
-    :if ($scriptTlgrm) do={                                                             # when script is not active ->
-        :set scriptTlgrm false;
+    :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};                             # creating a script running flag
+    :if ($scriptTlgrm) do={                                                             # when script is active ->
+        :set scriptTlgrm false;                                                         # script running flag is active 
         :if ([:len $timeAct]>0) do={:put "$[$CurrentTime]\tTime executed last command:\t$[$UnixToDateTimeDEL $timeAct]"}
         :if ([:len $timeLog]>0) do={:put "$[$CurrentTime]\tTime sent last log entries:\t$[$UnixToDateTimeDEL $timeLog]"}
 
@@ -168,14 +168,14 @@
         :local httpResp "";
         :if ([:len $timeAct]=0) do={:put "$[$CurrentTime]\tTime of last launch not found"; :set timeAct $timeStmp}
         :do {:set httpResp [/tool fetch url=$urlString as-value output=user]} on-error={}
-        :if ([:len $httpResp]!=0) do={
+        :if ([:len $httpResp]!=0) do={                                                  # when Telegram server responded to request ->
             :local content ($httpResp->"data");
             :if ([:len $content]>30) do={
                 :local msgTxt [$MsgParser $content "text" true];
                 :set   msgTxt [:pick $msgTxt ([:find $msgTxt "/" -1]+1) [:len $msgTxt]];
                 :if ($msgTxt~"@") do={:set msgTxt [:pick $msgTxt 0 [:find $msgTxt "@"]]}
                 :local newStr ""; :local change ""; :local msgAddr "";
-                :for i from=0 to=([:len $msgTxt]-1) do={
+                :for i from=0 to=([:len $msgTxt]-1) do={                                # cyclic replacement of character '_' by ' '
                     :local symb [:pick $msgTxt $i ($i+1)];
                     :if ($symb="_") do={:set change " "} else={:set change $symb} 
                     :set newStr "$newStr$change";
@@ -245,8 +245,8 @@
         :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or topics~"wireless"\
             or topics~"dhcp" or topics~"firewall" or message~" logged ")]];             # list of potentially interesting log entries
         :local logCnt [:len $logGet];                                                   # counter of suitable log entries
-        :local outMsg ""; :local tlgCnt 0;                                              # counter of log entries sent to Telegram
-        :if ([:len $timeLog]=0) do={
+        :local outMsg ""; :local tlgCnt 0;
+        :if ([:len $timeLog]=0) do={                                                    # when time of last broadcast in Telegram not found ->
             :put "$[$CurrentTime]\tTime of the last log entry was not found";
             :set outMsg "$[/system clock get time] Telegram notification started";
             :set tlgCnt ($tlgCnt+1);
@@ -323,7 +323,7 @@
                 }
 # -------------------- user information output ---- END -------------------
                 :set logCnt ($logCnt-1);
-            } while=($unixTim>$timeLog && $logCnt>-1);
+            } while=($unixTim>$timeLog && $logCnt>-1);                                  # iterating through list of messages
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
                 :set timeLog $lastTime;
                 :set outMsg [$CP1251toUTF8inURN $outMsg];                               # converting MESSAGE to UTF8 in URN-standart
