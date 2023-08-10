@@ -326,7 +326,7 @@
                 }
 # -------------------- user information output ---- END -------------------
                 :set logCnt ($logCnt-1);
-            } while=($unixTim>$timeLog && $logCnt>-1);                                  # iterating through list of messages
+            } while=($unixTim>$timeLog && $logCnt>-1 && [:len $outMsg]<4096);           # iterating through list of messages
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
                 :set timeLog $lastTime;
                 :set outMsg [$CP1251toUTF8inURN $outMsg];                               # converting MESSAGE to UTF8 in URN-standart
