@@ -13,8 +13,8 @@
     :local launchScr true;                                                              # permission to execute scripts
     :local launchFnc true;                                                              # permission to perform functions
     :local launchCmd true;                                                              # permission to execute commands
-    :local sysInfo   false;                                                             # system information broadcast to Telegram
-    :local userInfo  true;                                                              # user information broadcast to Telegram
+    :local sysInfo   true;                                                              # system information broadcast to Telegram
+    :local userInfo  false;                                                             # user information broadcast to Telegram
     :local emo {
         "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
         "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
@@ -307,9 +307,6 @@
                             } on-error={}
                             :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
-                            
-                            :set preloadMessage "$tempTim $tempIfc $tempStg $tempAdr $tempHst $tempCmt ";
-                            
                             :if ($tempDyn!="") do={
                                 :if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempCmt $tempAdr $tempHst"; # output when dynamic client
                                 } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};         # output when static client
