@@ -13,8 +13,8 @@
     :local launchScr true;                                                              # permission to execute scripts
     :local launchFnc true;                                                              # permission to perform functions
     :local launchCmd true;                                                              # permission to execute commands
-    :local sysInfo   true;                                                              # system information broadcast to Telegram
-    :local userInfo  false;                                                             # user information broadcast to Telegram
+    :local sysInfo   false;                                                             # system information broadcast to Telegram
+    :local userInfo  true;                                                              # user information broadcast to Telegram
     :local emo {
         "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
         "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
@@ -292,7 +292,7 @@
                         :local preloadMessage "";
                         :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
                         :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
-                        :if ($tempMsg~" assigned ([0-9]{3}[.]){3}[0-9]{3}") do={
+                        :if ($tempMsg~" assigned ((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
                             :if ($tempMsg~" to " ) do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to" ]-1)]}; # specificity ROS6
                             :if ($tempMsg~" for ") do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "for"]-1)]}; # specificity ROS7
                         }
@@ -307,12 +307,15 @@
                             } on-error={}
                             :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
+                            
+                            :set preloadMessage "$tempTim $tempIfc $tempStg $tempAdr $tempHst $tempCmt ";
+                            
                             :if ($tempDyn!="") do={
                                 :if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempCmt $tempAdr $tempHst"; # output when dynamic client
-                                } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};                              # output when static client
+                                } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};         # output when static client
                             }
-                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"};  # output when user1
-                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"};  # output when user2
+                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"}; # output when user1
+                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"}; # output when user2
                         }
                         :if ($preloadMessage!="") do={
                             :set tlgCnt ($tlgCnt+1);
