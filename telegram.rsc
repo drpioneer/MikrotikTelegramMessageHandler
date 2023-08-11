@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/10
+# updated 2023/08/11
 
 :global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
@@ -308,7 +308,7 @@
                             :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
                             :if ($tempDyn!="") do={
-                                :if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempCmt $tempAdr $tempHst"; # output when dynamic client
+                                :if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempAdr $tempHst"; # output when dynamic client
                                 } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};         # output when static client
                             }
                             :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"}; # output when user1
