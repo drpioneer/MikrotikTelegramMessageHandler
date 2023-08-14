@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/11
+# updated 2023/08/15
 
 :global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
@@ -20,6 +20,18 @@
         "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
     :global timeAct;                                                                    # time when the last command was executed
     :global timeLog;                                                                    # time when the log entries were last sent
+
+    # --------------------------------------------------------------------------------- # MAC address search function
+    :local FindMAC do={                                                                 # https://forummikrotik.ru/viewtopic.php?p=73994#p73994
+        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""}
+        :if ($1~"([0-9A-Fa-f]{2}[:]){5}[0-9A-Fa-f]{2}") do={
+            :foreach id in=[/ip dhcp-server lease find disabled=no] do={
+                :local mac [/ip dhcp-server lease get $id mac-address];
+                :if ($1~$mac) do={:return $mac}
+            }
+        }
+        :return "";
+    }
 
     # --------------------------------------------------------------------------------- # function of converting CP1251 to UTF8 in URN-standart
     :local CP1251toUTF8inURN do={                                                       # https://forum.mikrotik.com/viewtopic.php?p=967513#p967513
@@ -264,9 +276,9 @@
 # ------------------ system information output --- BEGIN ------------------
                     :if ($sysInfo) do={                                                 # broadcast SYSTEM information ->
                         :local preloadMessage "";
-                        :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
+                        :local tempAdr ""; :local tempCmt ""; :local tempHst "";
                         :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
-                        :if ($tempMsg~"([0-9A-Fa-f]{2}[:]){5}[0-9A-Fa-f]{2}") do={:set tempMac [:pick $tempMsg ([:find $tempMsg ":"]-2) ([:find $tempMsg ":"]+15)]}
+                        :local tempMac [$FindMAC $tempMsg];                             # searching familiar MAC address in log entries
                         :if ($tempMac="") do={:set preloadMessage "$tempTim $tempMsg";  # output when message without real MAC address
                         } else={                                                        # when message with real MAC address ->
                             :do {
