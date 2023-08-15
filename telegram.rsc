@@ -21,18 +21,6 @@
     :global timeAct;                                                                    # time when the last command was executed
     :global timeLog;                                                                    # time when the log entries were last sent
 
-    # --------------------------------------------------------------------------------- # MAC address search function
-    :local FindMAC do={                                                                 # https://forummikrotik.ru/viewtopic.php?p=73994#p73994
-        :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""}
-        :if ($1~"([0-9A-Fa-f]{2}[:]){5}[0-9A-Fa-f]{2}") do={
-            :foreach id in=[/ip dhcp-server lease find disabled=no] do={
-                :local mac [/ip dhcp-server lease get $id mac-address];
-                :if ($1~$mac) do={:return $mac}
-            }
-        }
-        :return "";
-    }
-
     # --------------------------------------------------------------------------------- # function of converting CP1251 to UTF8 in URN-standart
     :local CP1251toUTF8inURN do={                                                       # https://forum.mikrotik.com/viewtopic.php?p=967513#p967513
         :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""};                   # https://habr.com/ru/articles/232385/#urn
@@ -276,22 +264,26 @@
 # ------------------ system information output --- BEGIN ------------------
                     :if ($sysInfo) do={                                                 # broadcast SYSTEM information ->
                         :local preloadMessage "";
-                        :local tempAdr ""; :local tempCmt ""; :local tempHst "";
-                        :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
-                        :local tempMac [$FindMAC $tempMsg];                             # searching familiar MAC address in log entries
-                        :if ($tempMac="") do={:set preloadMessage "$tempTim $tempMsg";  # output when message without real MAC address
-                        } else={                                                        # when message with real MAC address ->
+                        :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
+                        :local tempDyn ""; :local tempIfc "none"; :local tempStg ""; :local findMac "";
+                        :if ($tempMsg~"([0-9A-F]{2}[:]){5}[0-9A-F]{2}") do={:set findMac [:pick $tempMsg ([:find $tempMsg ":"]-2) ([:find $tempMsg ":"]+15)]}
+                        :if ($findMac!="") do={                                         # when any MAC address is detected ->
                             :do {
-                                :set tempCmt [/ip dhcp-server lease get [find mac-address=$tempMac] comment];
-                                :set tempHst [/ip dhcp-server lease get [find mac-address=$tempMac] host-name];
-                                :set tempDyn [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] dynamic];
-                                :set tempAdr [/ip dhcp-server lease get [find mac-address=$tempMac status="bound"] address];
+                                :set tempMac [/ip dhcp-server lease get [find mac-address=$findMac] mac-address];
+                                :set tempCmt [/ip dhcp-server lease get [find mac-address=$findMac] comment];
+                                :set tempHst [/ip dhcp-server lease get [find mac-address=$findMac] host-name];
+                                :set tempDyn [/ip dhcp-server lease get [find mac-address=$findMac status="bound"] dynamic];
+                                :set tempAdr [/ip dhcp-server lease get [find mac-address=$findMac status="bound"] address];
                             } on-error={}
-                            :if ($tempDyn!="") do={                                     # when DHCP-server lease client is actual ->
-                                :if (!$tempDyn && $tempCmt="") do={                     # when message with static IP & unfamiliar MAC ->
-                                    :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [empty client comment on DHCP lease]"}
+                            :if ($tempMac="") do={                                      # when unfamiliar MAC address ->
+                                :set preloadMessage "$tempTim $tempMsg [unfamiliar MAC]"
+                            } else={
+                                :if ($tempDyn!="") do={                                 # when DHCP-server lease client is actual ->
+                                    :if (!$tempDyn && $tempCmt="") do={                 # when message with static IP & no comment about DHCP lease ->
+                                        :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [no comment about DHCP lease]"}
+                                }
                             }
-                        }
+                        } else={:set preloadMessage "$tempTim $tempMsg"};               # output when message without MAC address
                         :if ($preloadMessage!="") do={
                             :set tlgCnt ($tlgCnt+1);
                             :set outMsg "$preloadMessage\n$outMsg";                     # attach to general message for Telegram
