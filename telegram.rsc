@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/15
+# updated 2023/08/18
 
 :global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
@@ -67,14 +67,14 @@
         :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
         :local lower "abcdefghijklmnopqrstuvwxyz";
         :local upper "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        :local result "";
+        :local res "";
         :for i from=0 to=([:len $1]-1) do={
-            :local char [:pick $1 $i];
-            :local pos [:find $upper $char];
-            :if ($pos>-1) do={:set char [:pick $lower $pos]};
-            :set result ($result.$char);
+            :local chr [:pick $1 $i];
+            :local pos [:find $upper $chr];
+            :if ($pos>-1) do={:set chr [:pick $lower $pos]};
+            :set res ($res.$chr);
         }
-        :return $result;
+        :return $res;
     }
 
     # --------------------------------------------------------------------------------- # telegram messenger response parsing function
@@ -276,11 +276,12 @@
                                 :set tempAdr [/ip dhcp-server lease get [find mac-address=$findMac status="bound"] address];
                             } on-error={}
                             :if ($tempMac="") do={                                      # when unfamiliar MAC address ->
-                                :set preloadMessage "$tempTim $tempMsg [unfamiliar MAC]"
+                                :set preloadMessage "$tempTim $tempMsg [unfamiliar MAC]";
                             } else={
                                 :if ($tempDyn!="") do={                                 # when DHCP-server lease client is actual ->
                                     :if (!$tempDyn && $tempCmt="") do={                 # when message with static IP & no comment about DHCP lease ->
-                                        :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [no comment about DHCP lease]"}
+                                        :set preloadMessage "$tempTim $tempMsg $tempHst $tempAdr [no comment about DHCP lease]";
+                                    }
                                 }
                             }
                         } else={:set preloadMessage "$tempTim $tempMsg"};               # output when message without MAC address
@@ -297,8 +298,8 @@
                         :local tempMac ""; :local tempAdr ""; :local tempCmt ""; :local tempHst "";
                         :local tempDyn ""; :local tempIfc "none"; :local tempStg "";
                         :if ($tempMsg~" assigned ((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
-                            :if ($tempMsg~" to " ) do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to" ]-1)]}; # specificity ROS6
-                            :if ($tempMsg~" for ") do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "for"]-1)]}; # specificity ROS7
+                            :if ($tempMsg~" to " ) do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "to" ]-1)]}; # specificity of ROS6
+                            :if ($tempMsg~" for ") do={:set tempAdr [:pick $tempMsg ([:find $tempMsg " assigned "]+10) ([:find $tempMsg "for"]-1)]}; # specificity of ROS7
                         }
                         :if ($tempAdr!="") do={                                         # when address leasing DHCP server ->
                             :do {
@@ -329,13 +330,12 @@
                 :set logCnt ($logCnt-1);
             } while=($unixTim>$timeLog && $logCnt>-1 && [:len $outMsg]<4096);           # iterating through list of messages
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
-                :set timeLog $lastTime;
                 :set outMsg [$CP1251toUTF8inURN $outMsg];                               # converting MESSAGE to UTF8 in URN-standart
                 :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cutting MESSAGE to 4096 bytes
                 :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}; # solitary message for pop-up notification on phone
                 :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
-                :put "$[$CurrentTime]\tGenerated string for Telegram:\r\n$urlString";
-                :do {/tool fetch url=$urlString as-value output=user} on-error={}
+                :put "$[$CurrentTime]\tGenerated string for Telegram:\t$urlString";
+                :do {/tool fetch url=$urlString as-value output=user; :set timeLog $lastTime} on-error={}
             } else={:put "$[$CurrentTime]\tThere are no log entries to send"}
         } else={:put "$[$CurrentTime]\tNecessary log entries were not found"}
         :put "$[$CurrentTime]\tEnd of TLGRM-script";
