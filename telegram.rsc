@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # tested on ROS 6.49.8
-# updated 2023/08/18
+# updated 2023/08/23
 
 :global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
@@ -335,7 +335,8 @@
                 :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}; # solitary message for pop-up notification on phone
                 :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
                 :put "$[$CurrentTime]\tGenerated string for Telegram:\t$urlString";
-                :do {/tool fetch url=$urlString as-value output=user; :set timeLog $lastTime} on-error={}
+                :do {/tool fetch url=$urlString as-value output=user; :set timeLog $lastTime;
+                } on-error={:put "$[$CurrentTime]\tUnsuccessful sending of message to Telegram"}
             } else={:put "$[$CurrentTime]\tThere are no log entries to send"}
         } else={:put "$[$CurrentTime]\tNecessary log entries were not found"}
         :put "$[$CurrentTime]\tEnd of TLGRM-script";
