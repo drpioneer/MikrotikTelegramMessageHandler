@@ -71,8 +71,7 @@
 бот должен быть подключен к ГРУППЕ (групповому чату), а не к КАНАЛУ.
 Опытным путём выяснено, что предпочтителен групповой чат Телеграм с id БЕЗ префикса '-100', в таком чате сообщения от ГРУППЫ роутеров не теряются.
 
-https://forummikrotik.ru/viewtopic.php?p=89956#p89956
-
-https://forum.mikrotik.com/viewtopic.php?p=1012951#p1012951
-
-https://habr.com/ru/post/650563
+Список литературы:
+  - https://forummikrotik.ru/viewtopic.php?p=89956#p89956
+  - https://forum.mikrotik.com/viewtopic.php?p=1012951#p1012951
+  - https://habr.com/ru/post/650563
