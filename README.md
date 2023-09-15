@@ -46,7 +46,7 @@
 Для формирования списка команд в Телеграм-группе через бота BotFather необходимо выполнить последовательность действий с BotFather: 
 вводим и отправляем команду: /setcommands выбираем нужного бота, выскочит подсказка:
 
-CODE: SELECT ALL
+CODE:
     command1 - Description
     command2 - Another description
 
