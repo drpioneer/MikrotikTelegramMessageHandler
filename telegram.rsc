@@ -1,9 +1,9 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
 # Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, sebastia, drPioneer
-# https://forummikrotik.ru/viewtopic.php?p=89956#p89956
+# https://forummikrotik.ru/viewtopic.php?p=91375#p91375
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
-# tested on ROS 6.49.8
-# updated 2023/08/23
+# tested on ROS 6.49.10 & 7.12
+# updated 2023/11/20
 
 :global scriptTlgrm;                                                                    # flag of running script: false=in progress, true=idle
 :do {
@@ -15,9 +15,10 @@
     :local launchCmd true;                                                              # permission to execute commands
     :local sysInfo   true;                                                              # system information broadcast to Telegram
     :local userInfo  false;                                                             # user information broadcast to Telegram
-    :local emo {
-        "phone"="%F0%9F%93%B1";"store"="%F0%9F%8F%AA";"envelope"="%E2%9C%89";
-        "smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"memo"="%F0%9F%93%9D"};            # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
+    :local emoList {
+        "cherry"="%F0%9F%8D%92"; "monkey"="%F0%9F%90%92"; "crown"="%F0%9F%91%91";
+        "smile"="%F0%9F%98%8E"; "bell"="%F0%9F%94%94"; "dancer"="%F0%9F%92%83"};        # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
+    :local emoDev  ($emoList->"cherry");                                                # device emoji in chat
     :global timeAct;                                                                    # time when the last command was executed
     :global timeLog;                                                                    # time when the log entries were last sent
 
@@ -95,7 +96,7 @@
     }
 
     # --------------------------------------------------------------------------------- # time translation function to UNIX-time
-    :global DateTime2EpochDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
+    :global DateTime2EpochTLG do={                                                      # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
         :local dTime [:tostr $1]; :local yesterDay false;                               # parses date formats:  "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss",
         /system clock;                                                                  #                       "yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
         :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
@@ -123,7 +124,7 @@
     }
 
     # --------------------------------------------------------------------------------- # time conversion function from UNIX-time
-    :global UnixToDateTimeDEL do={                                                      # https://forum.mikrotik.com/viewtopic.php?p=977170#p977170
+    :global UnixToDateTimeTLG do={                                                      # https://forum.mikrotik.com/viewtopic.php?p=977170#p977170
         :local ZeroFill do={:return [:pick (100+$1) 1 3]}
         :local prMntDays [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
         :local vGmt [:tonum [/system clock get gmt-offset]]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
@@ -146,9 +147,9 @@
 
     # --------------------------------------------------------------------------------- # current time in nice format output function
     :local CurrentTime do={
-        :global DateTime2EpochDEL;
-        :global UnixToDateTimeDEL;
-        :return [$UnixToDateTimeDEL [$DateTime2EpochDEL]];
+        :global DateTime2EpochTLG;
+        :global UnixToDateTimeTLG;
+        :return [$UnixToDateTimeTLG [$DateTime2EpochTLG]];
     }
 
     # ================================================================================= # main body of the script ========================
@@ -158,12 +159,12 @@
     :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};                             # creating a script running flag
     :if ($scriptTlgrm) do={                                                             # when script is active ->
         :set scriptTlgrm false;                                                         # script running flag is active 
-        :if ([:len $timeAct]>0) do={:put "$[$CurrentTime]\tTime executed last command:\t$[$UnixToDateTimeDEL $timeAct]"}
-        :if ([:len $timeLog]>0) do={:put "$[$CurrentTime]\tTime sent last log entries:\t$[$UnixToDateTimeDEL $timeLog]"}
+        :if ([:len $timeAct]>0) do={:put "$[$CurrentTime]\tTime executed last command:\t$[$UnixToDateTimeTLG $timeAct]"}
+        :if ([:len $timeLog]>0) do={:put "$[$CurrentTime]\tTime sent last log entries:\t$[$UnixToDateTimeTLG $timeLog]"}
 
         # ----------------------------------------------------------------------------- # part of the script body to execute via Telegram ---
         :put "$[$CurrentTime]\t*** Stage of launch via Telegram ***";                   # https://forummikrotik.ru/viewtopic.php?p=78085
-        :local timeStmp [$DateTime2EpochDEL];
+        :local timeStmp [$DateTime2EpochTLG];
         :local urlString "https://api.telegram.org/$botID/getUpdates\?offset=-1&limit=1&allowed_updates=message";
         :local httpResp "";
         :if ([:len $timeAct]=0) do={:put "$[$CurrentTime]\tTime of last launch not found"; :set timeAct $timeStmp}
@@ -251,14 +252,14 @@
             :set outMsg "$[/system clock get time] Telegram notification started";
             :set tlgCnt ($tlgCnt+1);
         }
-        :if ($timeLog>[$DateTime2EpochDEL]) do={:set timeLog [$DateTime2EpochDEL]};     # correction when time of last broadcast to Telegram turned out to be from future
+        :if ($timeLog>[$DateTime2EpochTLG]) do={:set timeLog [$DateTime2EpochTLG]};     # correction when time of last broadcast to Telegram turned out to be from future
         :if ($logCnt>0) do={                                                            # when log entries are available ->
             :set logCnt ($logCnt-1);                                                    # index of last log entry
-            :local lastTime [$DateTime2EpochDEL [/log get [:pick $logGet $logCnt] time]]; # time of the last message
+            :local lastTime [$DateTime2EpochTLG [/log get [:pick $logGet $logCnt] time]]; # time of the last message
             :local unixTim  "";
             :do {
                 :local tempTim [/log get [:pick $logGet $logCnt] time];                 # message time in router format
-                :set unixTim [$DateTime2EpochDEL $tempTim];                             # message time in UNIX format
+                :set unixTim [$DateTime2EpochTLG $tempTim];                             # message time in UNIX format
                 :if ($unixTim>$timeLog) do={                                            # selection of actualing log entries ->
                     :local tempMsg [/log get [:pick $logGet $logCnt] message];          # message body
 # ------------------ system information output --- BEGIN ------------------
@@ -308,16 +309,17 @@
                                 :set tempDyn [/ip dhcp-server lease get [find address=$tempAdr] dynamic];
                                 :set tempMac [/ip dhcp-server lease get [find address=$tempAdr] mac-address];
                                 :set tempIfc [/interface bridge host get [find mac-address=$tempMac] on-interface];
-                                :set tempStg [/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0];
+                                :set tempStg [[:parse "[/interface wireless registration-table get [find last-ip=$tempAdr] signal-strength-ch0]"]];
+                                :if ([:len $tempStg]=0) do={:set tempStg [[:parse "[/interface wifiwave2 registration-table get [find last-ip=$tempAdr] signal-strength-ch0]"]]}
                             } on-error={}
                             :if ($tempStg!="") do={:set tempStg ($tempStg."dBm")}
                             :local prefiksForLan "77_"; :local user1 "User1"; :local user2 "User2"; :local whereUser "PLACENAME";
                             :if ($tempDyn!="") do={
-                                :if ($tempDyn) do={:set preloadMessage "$[($emo->"phone")] $tempTim +$tempIfc $tempStg $tempAdr $tempHst"; # output when dynamic client
-                                } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};         # output when static client
+                                :if ($tempDyn) do={:set preloadMessage "$[($emoList->"smile")] $tempTim +$tempIfc $tempStg $tempAdr $tempHst"; # output when dynamic client
+                                } else={:set preloadMessage "$tempCmt $tempTim +$tempIfc $tempStg $tempAdr $tempHst"};              # output when static client
                             }
-                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emo->"store")] $tempTim $user1 at $whereUser"}; # output when user1
-                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emo->"phone")] $tempTim $user2 at $whereUser"}; # output when user2
+                            :if ($tempCmt=$user1) do={:set preloadMessage "$[($emoList->"bell")] $tempTim $user1 at $whereUser"};   # output when user1
+                            :if ($tempCmt=$user2) do={:set preloadMessage "$[($emoList->"smile")] $tempTim $user2 at $whereUser"};  # output when user2
                         }
                         :if ($preloadMessage!="") do={
                             :set tlgCnt ($tlgCnt+1);
@@ -331,21 +333,22 @@
             } while=($unixTim>$timeLog && $logCnt>-1 && [:len $outMsg]<4096);           # iterating through list of messages
             :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lastTime && [:len $outMsg]>8)) do={
                 :set outMsg [$CP1251toUTF8inURN $outMsg];                               # converting MESSAGE to UTF8 in URN-standart
-                :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cutting MESSAGE to 4096 bytes
-                :if ($tlgCnt=1) do={:set outMsg "%20$outMsg"} else={:set outMsg "%0A$outMsg"}; # solitary message for pop-up notification on phone
-                :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$nameID:$outMsg";
+                :if ([:len $emoDev]!=0) do={:set emoDev ("$emoDev%20$nameID:")} else={:set emoDev ("$nameID:")}
+                :if ($tlgCnt=1) do={:set outMsg "$emoDev%20$outMsg"} else={:set outMsg "$emoDev%0A$outMsg"}; # solitary message for pop-up notification on phone
+                :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]};      # cutting MSG to 4096 bytes
+                :set urlString "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$outMsg";
                 :put "$[$CurrentTime]\tGenerated string for Telegram:\t$urlString";
                 :do {/tool fetch url=$urlString as-value output=user; :set timeLog $lastTime;
                 } on-error={:put "$[$CurrentTime]\tUnsuccessful sending of message to Telegram"}
             } else={:put "$[$CurrentTime]\tThere are no log entries to send"}
         } else={:put "$[$CurrentTime]\tNecessary log entries were not found"}
         :put "$[$CurrentTime]\tEnd of TLGRM-script";
-        /system script environment remove [find name~"DEL"];                            # clearing memory
+        /system script environment remove [find name~"TLG"];                            # clearing memory
         :set scriptTlgrm true;
     } else={:put "$currTime\tScript already being executed"; :put "$currTime\tEnd of TLGRM-script"}
 } on-error={                                                                            # when emergency break script ->
     :put "Script error: something didn't work when sending a request to Telegram";
     :put "*** First, check the correctness of the values of the variables botID & myChatID ***";
-    /system script environment remove [find name~"DEL"];                                # clearing memory
+    /system script environment remove [find name~"TLG"];                                # clearing memory
     :set scriptTlgrm true;
 }
