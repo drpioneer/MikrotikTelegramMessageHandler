@@ -3,12 +3,14 @@
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # tested on ROS 6.49.10 & 7.12
-# updated 2024/02/20
+# updated 2024/02/21
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
-  :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-  :local myChatID "-XXXXXXXXX";
+  :local botID    "bot1634516656:AAEzZLxt_xC17SRmJx5ncbulN-KZ27SPEKI";
+  :local myChatID "-602412816";
+#  :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+#  :local myChatID "-XXXXXXXXX";
   :local broadCast false; # non-addressed reception mode
   :local launchScr true;  # permission to execute scripts
   :local launchFnc true;  # permission to perform functions
@@ -16,9 +18,8 @@
   :local sysInfo   true;  # system information broadcast to Telegram
   :local userInfo  false; # user information broadcast to Telegram
   :local emoList {
-    "cherry"="%F0%9F%8D%92"; "monkey"="%F0%9F%90%92";
-    "crown"="%F0%9F%91%91"; "smile"="%F0%9F%98%8E";
-    "bell"="%F0%9F%94%94"; "dancer"="%F0%9F%92%83"}; # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
+    "cherry"="%F0%9F%8D%92";"monkey"="%F0%9F%90%92";"crown"="%F0%9F%91%91";"smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"dancer"="%F0%9F%92%83"};
+    # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
   :local emoDev ($emoList->"cherry"); # device emoji in chat
   :global timeAct; # time when the last command was executed
   :global timeLog; # time when the log entries were last sent
@@ -163,8 +164,8 @@
     :if ([:len $1]=0) do={:return ""};
     :local tmpMac ""; :local tmpAdr ""; :local tmpCmt ""; :local tmpHst ""; :local tmpDyn ""; :local tmpIfc "none"; :local tmpStg "";
     :if ($1~" assigned ((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
-      :if ($1~" to " ) do={:set tmpAdr [:pick $1 ([:find $1 " assigned "]+10) ([:find $1 "to" ]-1)]};   # specificity of ROS6
-      :if ($1~" for ") do={:set tmpAdr [:pick $1 ([:find $1 " assigned "]+10) ([:find $1 "for"]-1)]}};  # specificity of ROS7
+      :if ($1~" to ") do={:set tmpAdr [:pick $1 ([:find $1 " assigned "]+10) ([:find $1 "to"]-1)]}; # specificity of ROS6
+      :if ($1~" for ") do={:set tmpAdr [:pick $1 ([:find $1 " assigned "]+10) ([:find $1 "for"]-1)]}}; # specificity of ROS7
     :if ($tmpAdr!="") do={ # when address leasing DHCP server ->
       :do {
         /ip dhcp-server lease;
@@ -304,6 +305,6 @@
     :put "$[$U2T [$T2U]]\tEnd of TLGRM-script";
   } else={:put "$startTime\tScript already being executed"; :put "$startTime\tEnd of TLGRM-script"}
 } on-error={
-  /log warning "Problem in work Telegram script";
+  /log warning "Problem in work TLGRM script";
   :put "Script error: It may be worth checking correctness values of variables botID & myChatID"}
 :set scriptTlgrm true;
