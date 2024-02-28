@@ -16,7 +16,7 @@
   :local sysInfo   true;  # system information broadcast to Telegram
   :local userInfo  false; # user information broadcast to Telegram
   :local emoList {
-    "cherry"="%F0%9F%8D%92";"monkey"="%F0%9F%90%92";"crown"="%F0%9F%91%91";"smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"dancer"="%F0%9F%92%83"};
+    "cherry"="%F0%9F%8D%92";"monkey"="%F0%9F%90%92";"crown"="%F0%9F%91%91";"smile"="%F0%9F%98%8E";"bell"="%F0%9F%94%94";"dancer"="%F0%9F%92%83"}
     # emoji list: https://apps.timwhitlock.info/emoji/tables/unicode
   :local emoDev ($emoList->"cherry"); # device emoji in chat
   :global timeAct; # time when the last command was executed
@@ -57,8 +57,7 @@
       :if ([:len $utf]=4) do={:set urn "%$[:pick $utf 0 2]%$[:pick $utf 2 4]"}
       :if ([:len $utf]=6) do={:set urn "%$[:pick $utf 0 2]%$[:pick $utf 2 4]%$[:pick $utf 4 6]"}
       :set res "$res$urn"}
-    :return $res;
-  }
+    :return $res}
 
   # function of converting to lowercase letters # https://forum.mikrotik.com/viewtopic.php?p=714396#p714396
   :local LowerCase do={
@@ -68,8 +67,7 @@
       :local chr [:pick $1 $i]; :local pos [:find $upper $chr];
       :if ($pos>-1) do={:set chr [:pick $lower $pos]};
       :set res ($res.$chr)}
-    :return $res;
-  }
+    :return $res}
 
   # telegram messenger response parsing function # https://habr.com/ru/post/482802/
   :local MsgParser do={
@@ -83,8 +81,7 @@
     :if ($startSymbol="{") do={:set endLoc ($brakeLoc+1)}
     :if ($3=true) do={:set startLoc ($startLoc+1); :set endLoc ($endLoc-1)}
     :if ($endLoc<$startLoc) do={:set endLoc ($startLoc+1)}
-    :return [:pick $1 $startLoc $endLoc];
-  }
+    :return [:pick $1 $startLoc $endLoc]}
 
   # time translation function to UNIX time # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
   :local T2U do={ # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
@@ -108,8 +105,7 @@
     :if ((($year-1968)%4)=0) do={:set ($arrMn->1) -1; :set ($arrMn->2) 30}
     :local toTd ((($year-1970)*365)+(($year-1968)/4)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)]-1));
     :if ($yesterDay) do={:set toTd ($toTd-1)}; # bypassing ROS6.xx time format problem after 00:00:00
-    :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt);
-  }
+    :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt)}
 
   # time conversion function from UNIX time # https://forum.mikrotik.com/viewtopic.php?p=977170#p977170
   :local U2T do={
@@ -131,8 +127,7 @@
     :local mnthStamp 12; :while (($prMntDays->$mnthStamp)>$tmpDays) do={:set mnthStamp ($mnthStamp-1)}
     :local dayStamp [$ZeroFill (($tmpDays+1)-($prMntDays->$mnthStamp))];
     :local timeStamp (00:00:00+[:totime ($tmpSec%86400)]);
-    :if ([:len $2]=0) do={:return "$yearStamp/$[$ZeroFill $mnthStamp]/$[$ZeroFill $dayStamp] $timeStamp"} else={:return "$timeStamp"}
-  }
+    :if ([:len $2]=0) do={:return "$yearStamp/$[$ZeroFill $mnthStamp]/$[$ZeroFill $dayStamp] $timeStamp"} else={:return "$timeStamp"}}
 
   # system information collection function
   :local SysInfo do={
@@ -151,8 +146,7 @@
       } else={ # when DHCP-server lease client is actual & with static IP & no comment about DHCP lease
         :if ($tmpDyn!="" && !$tmpDyn && $tmpCmt="") do={:return "$2 $1 $tmpHst $tmpAdr [no comment about DHCP lease]"}}
     } else={:return "$2 $1"}; # when message without MAC address
-    :return "";
-  }
+    :return ""}
 
   # user information collection function
   :local UsrInfo do={
@@ -178,8 +172,7 @@
         } else={:return "$tmpCmt $2 +$tmpIfc $tmpStg $tmpAdr $tmpHst"}}; # output when static client
       :if ($tmpCmt=$user1) do={:return "$[($emoList->"bell")] $2 $user1 at $whereUser"}; # output when user1
       :if ($tmpCmt=$user2) do={:return "$[($emoList->"smile")] $2 $user2 at $whereUser"}}; # output when user2
-    :return "";
-  }
+    :return ""}
 
   # main body
   :local nameID [$LowerCase [/system identity get name]]; # text ID of router
