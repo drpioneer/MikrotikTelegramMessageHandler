@@ -3,7 +3,7 @@
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # tested on ROS 6.49.10 & 7.12
-# updated 2024/02/21
+# updated 2024/02/28
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
@@ -24,7 +24,7 @@
 
   # function of converting CP1251 to UTF8 in URN # https://forum.mikrotik.com/viewtopic.php?p=967513#p967513
   :local CP1251toUTF8inURN do={
-    :if (([:typeof $1]!="str") or ([:len $1]=0)) do={:return ""};
+    :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""};
     :local cp1251 {
       "\00";"\01";"\02";"\03";"\04";"\05";"\06";"\07";"\08";"\09";"\0A";"\0B";"\0C";"\0D";"\0E";"\0F";
       "\10";"\11";"\12";"\13";"\14";"\15";"\16";"\17";"\18";"\19";"\1A";"\1B";"\1C";"\1D";"\1E";"\1F";
@@ -87,7 +87,7 @@
   }
 
   # time translation function to UNIX time # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
-  :local T2U do={ # parses date formats: "hh:mm:ss" "mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss" "yyyy-mm-dd hh:mm:ss" "mm-dd hh:mm:ss"
+  :local T2U do={ # parses date formats: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
     :local dTime [:tostr $1]; :local yesterDay false;
     /system clock;
     :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
@@ -96,12 +96,9 @@
     :if ([:len $dTime]=14) do={:set dTime "$cYear-$[:pick $dTime 0 5] $[:pick $dTime 6 14]"}
     :if ([:len $dTime]=8) do={:if ([:totime $1]>[get time]) do={:set yesterDay true}; :set dTime "$[get date] $dTime"}
     :if ([:tostr $1]="") do={:set dTime ("$[get date] $[get time]")}
-    :local vDate [:pick $dTime 0 [:find $dTime " " -1]];
-    :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]];
-    :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
-    :if ($vGmt<0) do={:set vGmt ($vGmt*-1)}
-    :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"];
-    :local vdOff [:toarray "0,4,5,7,8,10"];
+    :local vDate [:pick $dTime 0 [:find $dTime " " -1]]; :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]];
+    :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}; :if ($vGmt<0) do={:set vGmt ($vGmt*-1)}
+    :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"]; :local vdOff [:toarray "0,4,5,7,8,10"];
     :local month [:tonum [:pick $vDate ($vdOff->2) ($vdOff->3)]];
     :if ($vDate~".../../....") do={
       :set vdOff [:toarray "7,11,1,3,4,6"];
@@ -262,21 +259,21 @@
 
     # part of script body for notifications in Telegram # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
     :put "$[$U2T [$T2U]]\t*** Stage of broadcasting to Telegram ***";
-    :local logGet [:toarray [/log find (topics~"warning" or topics~"error" or topics~"critical" or topics~"caps"\
-      or topics~"wireless" or topics~"dhcp" or topics~"firewall" or message~" logged ")]]; # list of potentially interesting log entries
-    :local outMsg ""; :local tlgCnt 0; :local logCnt [:len $logGet]; # counter of suitable log entries
+    :local logIDs [/log find topics~"warning" or topics~"error" or topics~"critical" or topics~"caps" or\
+      topics~"wireless" or topics~"dhcp" or topics~"firewall" or message~" logged "]; # list of potentially interesting log entries
+    :local outMsg ""; :local tlgCnt 0; :local logCnt [:len $logIDs]; # counter of suitable log entries
     :if ([:len $timeLog]=0) do={ # when time of last broadcast in Telegram not found ->
       :put "$[$U2T [$T2U]]\tTime of the last log entry was not found";
       :set outMsg "$[$U2T [$T2U] "time"]\tTelegram notification started"; :set tlgCnt ($tlgCnt+1)}
     :if ($timeLog>[$T2U]) do={:set timeLog [$T2U]}; # correction when time of last broadcast to Telegram turned out to be from future
     :if ($logCnt>0) do={ # when log entries are available ->
       :set logCnt ($logCnt-1); # index of last log entry
-      :local unxTim ""; :local lstTim [$T2U [/log get [:pick $logGet $logCnt] time]]; # time of the last message
+      :local unxTim ""; :local lstTim [$T2U [/log get [:pick $logIDs $logCnt] time]]; # time of last log entry
       :do {
-        :local tmpTim [/log get [:pick $logGet $logCnt] time]; # message time in router format
+        :local tmpTim [/log get [:pick $logIDs $logCnt] time]; # message time in router format
         :set unxTim [$T2U $tmpTim]; :set tmpTim [$U2T $unxTim "time"]; # message time
         :if ($unxTim>$timeLog) do={ # selection of actualing log entries ->
-          :local tmpMsg [/log get [:pick $logGet $logCnt] message]; # message body
+          :local tmpMsg [/log get [:pick $logIDs $logCnt] message]; # message body
           :if ($sysInfo) do={
             :local preMsg [$SysInfo $tmpMsg $tmpTim]; # broadcast SYSTEM information
             :if ($preMsg!="") do={
@@ -289,8 +286,8 @@
               :put "$[$U2T [$T2U]]\tAdded entry: $preMsg"}}}
         :set logCnt ($logCnt-1);
       } while=($unxTim>$timeLog && $logCnt>-1 && [:len $outMsg]<4096); # iterating through list of messages
-      :if ([:len $timeLog]=0 or ([:len $timeLog]>0 && $timeLog!=$lstTim && [:len $outMsg]>8)) do={
-        :set outMsg [$CP1251toUTF8inURN $outMsg]; # converting MESSAGE to UTF8 in URN-standart
+      :if ([:len $timeLog]=0 or [:len $timeLog]>0 && $timeLog!=$lstTim && [:len $outMsg]>8) do={
+        :set outMsg [$CP1251toUTF8inURN $outMsg]; # converting MESSAGE to UTF8 in URN format
         :if ([:len $emoDev]!=0) do={:set emoDev ("$emoDev%20$nameID:")} else={:set emoDev ("$nameID:")}
         :if ($tlgCnt=1) do={:set outMsg "$emoDev%20$outMsg"} else={:set outMsg "$emoDev%0A$outMsg"}; # solitary message for pop-up notification on phone
         :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]}; # cutting MSG to 4096 bytes
