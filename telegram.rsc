@@ -1,7 +1,7 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
 # Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, sebastia, drPioneer
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
-# https://forummikrotik.ru/viewtopic.php?p=89956#p89956
+# https://forummikrotik.ru/viewtopic.php?p=78085#p78085
 # tested on ROS 6.49.10 & 7.12
 # updated 2024/02/29
 
