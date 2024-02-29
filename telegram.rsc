@@ -3,12 +3,14 @@
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # https://forummikrotik.ru/viewtopic.php?p=89956#p89956
 # tested on ROS 6.49.10 & 7.12
-# updated 2024/02/28
+# updated 2024/02/29
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
-  :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-  :local myChatID "-XXXXXXXXX";
+  :local botID    "bot1634516656:AAEzZLxt_xC17SRmJx5ncbulN-KZ27SPEKI";
+  :local myChatID "-602412816";
+#  :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+#  :local myChatID "-XXXXXXXXX";
   :local broadCast false; # non-addressed reception mode
   :local launchScr true;  # permission to execute scripts
   :local launchFnc true;  # permission to perform functions
@@ -291,8 +293,8 @@
       } else={:put "$[$U2T [$T2U]]\tThere are no log entries to send"}
     } else={:put "$[$U2T [$T2U]]\tNecessary log entries were not found"}
     :put "$[$U2T [$T2U]]\tEnd of TLGRM-script";
+    :set scriptTlgrm true;
   } else={:put "$startTime\tScript already being executed"; :put "$startTime\tEnd of TLGRM-script"}
 } on-error={
-  /log warning "Problem in work TLGRM script";
+  /log warning "Problem in work TLGRM script"; :set scriptTlgrm true;
   :put "Script error: It may be worth checking correctness values of variables botID & myChatID"}
-:set scriptTlgrm true;
