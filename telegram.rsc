@@ -7,7 +7,7 @@
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
-  :local botID    "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+  :local botID    "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
   :local myChatID "-XXXXXXXXX";
   :local broadCast false; # non-addressed reception mode
   :local launchScr true;  # permission to execute scripts
@@ -187,7 +187,7 @@
     # part of script body to execute via Telegram # https://forummikrotik.ru/viewtopic.php?p=78085
     :put "$[$U2T [$T2U]]\t*** Stage of launch via Telegram ***";
     :local timeStmp [$T2U]; :local httpResp "";
-    :local urlStr "https://api.telegram.org/$botID/getUpdates\?offset=-1&limit=1&allowed_updates=message";
+    :local urlStr "https://api.telegram.org/bot$botID/getUpdates\?offset=-1&limit=1&allowed_updates=message";
     :if ([:len $timeAct]=0) do={:put "$[$U2T [$T2U]]\tTime of last launch not found"; :set timeAct $timeStmp}
     :do {:set httpResp [/tool fetch url=$urlStr as-value output=user]} on-error={}
     :if ([:len $httpResp]!=0) do={ # when Telegram server responded to request ->
@@ -284,7 +284,7 @@
         :if ([:len $emoDev]!=0) do={:set emoDev ("$emoDev%20$nameID:")} else={:set emoDev ("$nameID:")}
         :if ($tlgCnt=1) do={:set outMsg "$emoDev%20$outMsg"} else={:set outMsg "$emoDev%0A$outMsg"}; # solitary message for pop-up notification on phone
         :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]}; # cutting message to 4096 bytes
-        :set urlStr "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$outMsg";
+        :set urlStr "https://api.telegram.org/bot$botID/sendmessage\?chat_id=$myChatID&text=$outMsg";
         :put "$[$U2T [$T2U]]\tGenerated string for Telegram:\t$urlStr";
         :do {:set httpResp [/tool fetch url=$urlStr as-value output=user]; :set timeLog $lstTim} on-error={
           :put "$[$U2T [$T2U]]\tUnsuccessful sending of message to Telegram"}
