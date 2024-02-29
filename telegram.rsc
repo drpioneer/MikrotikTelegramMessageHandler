@@ -280,10 +280,10 @@
         :set logCnt ($logCnt-1);
       } while=($unxTim>$timeLog && $logCnt>-1 && [:len $outMsg]<4096); # iterating through list of messages
       :if ([:len $timeLog]=0 or [:len $timeLog]>0 && $timeLog!=$lstTim && [:len $outMsg]>8) do={
-        :set outMsg [$CP1251toUTF8inURN $outMsg]; # converting MESSAGE to UTF8 in URN format
+        :set outMsg [$CP1251toUTF8inURN $outMsg]; # converting message to UTF8 in URN format
         :if ([:len $emoDev]!=0) do={:set emoDev ("$emoDev%20$nameID:")} else={:set emoDev ("$nameID:")}
         :if ($tlgCnt=1) do={:set outMsg "$emoDev%20$outMsg"} else={:set outMsg "$emoDev%0A$outMsg"}; # solitary message for pop-up notification on phone
-        :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]}; # cutting MSG to 4096 bytes
+        :if ([:len $outMsg]>4096) do={:set outMsg [:pick $outMsg 0 4096]}; # cutting message to 4096 bytes
         :set urlStr "https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$outMsg";
         :put "$[$U2T [$T2U]]\tGenerated string for Telegram:\t$urlStr";
         :do {:set httpResp [/tool fetch url=$urlStr as-value output=user]; :set timeLog $lstTim} on-error={
@@ -294,5 +294,5 @@
     :set scriptTlgrm true;
   } else={:put "$startTime\tScript already being executed"; :put "$startTime\tEnd of TLGRM-script"}
 } on-error={
-  /log warning "Problem in work TLGRM script"; :set scriptTlgrm true;
-  :put "Script error: It may be worth checking correctness values of variables botID & myChatID"}
+  :set scriptTlgrm true; :put "Script error: It may be worth checking correctness values of variables botID & myChatID";
+  /log warning "Problem in work TLGRM script"}
