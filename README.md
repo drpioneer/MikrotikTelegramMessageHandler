@@ -35,7 +35,7 @@
   /mikrotik system reboot
 ~~~
 Настройки хранятся вначале скрипта и представляют собой преднастроенные переменные:
-- **botID** "botXXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" - идентификатор бота
+- **botID** "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" - идентификатор бота
 - **myChatID** "-XXXXXXXXX"  идентификатор чата
 - **broadCast**, где false = реакция на команды, предназначенные только этому устройству; true = реакция на все принятые команды
 - **launchScr**, где true = разрешение исполнения скриптов; false = запрет исполнения скриптов
