@@ -7,10 +7,8 @@
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
-  :local botID    "1634516656:AAEzZLxt_xC17SRmJx5ncbulN-KZ27SPEKI";
-  :local myChatID "-1001853586912";
-#  :local botID    "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-#  :local myChatID "-XXXXXXXXX";
+  :local botID    "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+  :local myChatID "-XXXXXXXXX";
   :local broadCast false; # non-addressed reception mode
   :local launchScr true;  # permission to execute scripts
   :local launchFnc true;  # permission to perform functions
