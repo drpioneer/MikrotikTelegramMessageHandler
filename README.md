@@ -31,6 +31,7 @@
   /forall log warning [/system resource get uptime]
   /mikrotik1_wol
   /mikrotik system reboot
+  /mikrot_ip_fir_fil_dis_[find_comment~"LAN"]
 ~~~
 Настройки хранятся вначале скрипта и представляют собой преднастроенные переменные:
 - **botID** "XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" - идентификатор бота
