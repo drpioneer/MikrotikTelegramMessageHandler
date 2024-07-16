@@ -29,8 +29,8 @@
 Примеры строк с командами:
 ~~~ 
   /forall log warning [/system resource get uptime]
-  /mikrotik1_wol
   /mikrotik system reboot
+  /mikrotik1_wol
   /mikrot_ip_fir_fil_dis_[find_comment~"LAN"]
 ~~~
 Настройки хранятся вначале скрипта и представляют собой преднастроенные переменные:
