@@ -2,8 +2,8 @@
 # Script uses ideas by Sertik, Virtue, Dimonw, -13-, Mk51, Alice Tails, Chupaka, rextended, sebastia, drPioneer
 # https://github.com/drpioneer/MikrotikTelegramMessageHandler
 # https://forummikrotik.ru/viewtopic.php?p=78085#p78085
-# tested on ROS 6.49.17 & 7.16.1
-# updated 2024/12/09
+# tested on ROS 6.49.17 & 7.16.2
+# updated 2025/01/01
 
 :global scriptTlgrm; # flag of running script: false=in progress, true=idle
 :do {
@@ -82,7 +82,7 @@
     :local endLoc $commaLoc; :local startSymbol [:pick $1 $startLoc]
     :if ($brakeLoc!=0 && ($commaLoc=0 or $brakeLoc<$commaLoc)) do={:set endLoc $brakeLoc}
     :if ($startSymbol="{") do={:set endLoc ($brakeLoc+1)}
-    :if ($3) do={:set startLoc ($startLoc+1); :set endLoc ($endLoc-1)}
+    :if ($3=true) do={:set startLoc ($startLoc+1); :set endLoc ($endLoc-1)}
     :if ($endLoc<$startLoc) do={:set endLoc ($startLoc+1)}
     :return [:pick $1 $startLoc $endLoc]}
 
